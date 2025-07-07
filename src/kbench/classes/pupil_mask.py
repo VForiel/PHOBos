@@ -195,7 +195,14 @@ class PupilMask():
         int
             Current position of the vertical Zaber motor (in steps).
         """
-        return self.newport.get(), self.zaber_h.get(), self.zaber_v.get()
+        wheel = float(self.newport.get())
+        zab2 = self.zaber_h.get()
+        zab1 = self.zaber_v.get()
+        
+        zab1 = int(zab1.split(' ')[-1][:-2])
+        zab2 = int(zab2.split(' ')[-1][:-2])
+        
+        return wheel, zab1, zab2
     
     def save_pos(self, mask, config_file):
         """
