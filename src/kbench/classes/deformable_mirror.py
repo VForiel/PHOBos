@@ -310,7 +310,7 @@ class Segment():
         float
             The tip value of the segment in milliradians.
         """
-        return self._tip * 1000.
+        return self._tip
 
     def get_tip_range(self) -> list[float]:
         """
@@ -360,7 +360,7 @@ class Segment():
         float
             The tilt value of the segment in milliradians.
         """
-        return self._tilt * 1000
+        return self._tilt
 
     def get_tilt_range(self) -> list[float]:
         """
@@ -397,7 +397,13 @@ class Segment():
         str
             The response of the mirror for the tilt change.
         """
-        return self.set_piston(piston), self.set_tip(tip), self.set_tilt(tilt)
+        tip = tip / 1000.
+        tilt = tilt / 1000.
+        self._piston = piston
+        self._tip = tip
+        self._tilt = tilt
+        return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)        
+        # return self.set_piston(piston), self.set_tip(tip), self.set_tilt(tilt)
 
     def get_ptt(self) -> tuple[float]:
         """
@@ -412,4 +418,5 @@ class Segment():
         float
             The tilt value of the segment in milliradians.
         """
+        
         return self.piston, self.tip, self.tilt
