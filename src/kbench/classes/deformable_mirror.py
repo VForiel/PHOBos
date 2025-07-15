@@ -199,9 +199,9 @@ class Segment():
     piston : float
         The piston value of the segment in nm.
     tip : float
-        The tip value of the segment in radians.
+        The tip value of the segment in milliradians.
     tilt : float
-        The tilt value of the segment in radians.
+        The tilt value of the segment in milliradians.
     """
 
     def __init__(self, dm:DM, id:int):
@@ -290,13 +290,14 @@ class Segment():
         Parameters
         ----------
         value : float
-            The tip value to set in radians.
+            The tip value to set in milliradians.
 
         Returns
         -------
         str
             The response of the mirror.
         """
+        value = value / 1000.
         self._tip = value
         return self.dm.bmcdm.set_segment(self.id, self.piston, value, self.tilt, True, True)
 
@@ -307,9 +308,9 @@ class Segment():
         Returns
         -------
         float
-            The tip value of the segment in radians.
+            The tip value of the segment in milliradians.
         """
-        return self._tip
+        return self._tip * 1000.
 
     def get_tip_range(self) -> list[float]:
         """
@@ -339,13 +340,14 @@ class Segment():
         Parameters
         ----------
         value : float
-            The tilt value to set in radians.
+            The tilt value to set in milliradians.
 
         Returns
         -------
         str
             The response of the mirror.
         """
+        value = value / 1000.
         self._tilt = value
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
 
@@ -356,9 +358,9 @@ class Segment():
         Returns
         -------
         float
-            The tilt value of the segment in radians.
+            The tilt value of the segment in milliradians.
         """
-        return self._tilt
+        return self._tilt * 1000
 
     def get_tilt_range(self) -> list[float]:
         """
@@ -382,9 +384,9 @@ class Segment():
         piston : float
             The piston value to set in nm.
         tip : float
-            The tip value to set in radians.
+            The tip value to set in milliradians.
         tilt : float
-            The tilt value to set in radians.
+            The tilt value to set in milliradians.
 
         Returns
         -------
@@ -406,8 +408,8 @@ class Segment():
         float
             The piston value of the segment in nm.
         float
-            The tip value of the segment in radians.
+            The tip value of the segment in milliradians.
         float
-            The tilt value of the segment in radians.
+            The tilt value of the segment in milliradians.
         """
         return self.piston, self.tip, self.tilt
