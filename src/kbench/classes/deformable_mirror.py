@@ -403,7 +403,6 @@ class Segment():
         self._tip = tip
         self._tilt = tilt
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)        
-        # return self.set_piston(piston), self.set_tip(tip), self.set_tilt(tilt)
 
     def get_ptt(self) -> tuple[float]:
         """
