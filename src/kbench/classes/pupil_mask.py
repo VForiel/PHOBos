@@ -149,36 +149,45 @@ class PupilMask():
         return self.rotate_clockwise(pos, abs)
 
     # Apply Mask --------------------------------------------------------------
-    def apply_mask(self, mask:int, config_file:str) -> str:
-                """
-                Rotate the mask wheel and move the Zabers to the desired mask position.
+    def apply_mask(self, key:str, config_file:str=None):
+        """
+        Rotate the mask wheel and move the Zabers to the desired mask position.
+        It can load the positions of the wheel and the zabers from a JSON file.
+        In this case, `key` is the string of the key of the JSON file of the desired configuration to set.
         
-                Parameters
-                ----------
-                mask : int
-                    Mask number to apply.
-                config_file: str
-                    Json file in which are stored the motors positions (wheel, Zaber 1 (vertical), Zaber 2 (horizontal))
-                    for each wheel position.
-                
-                Returns
-                -------
-                str
-                    Response from the motor after moving to the target position.
-                """
-                
-                with open(config_file, 'r') as f:
-                    data = json.load(f)
+        If no such file is given, `key` (string or int) is the number of the mask to put.
+        The zabers remains are not moved.
         
-                _, zab1, zab2 = data[str(mask)]
+        Parameters
+        ----------
+        key : str or int
+            Key of the config to load.
+        config_file: str, optional
+            Json file in which are stored the motors positions (wheel, Zaber 1 (vertical), Zaber 2 (horizontal))
+            for each wheel position. The default is None.
         
-                if zab1 >= 0:
-                    self.zaber_v.move_abs(zab1)
+        Returns
+        -------
+        str
+            Response from the motor after moving to the target position.
+        """
         
-                if zab2 >= 0:
-                    self.zaber_h.move_abs(zab2)
-                
-                self.newport.move_abs(self.newport_home + (mask-1)*60) # Move to the desired mask position
+        if not config_file is None:
+            with open(config_file, 'r') as f:
+                data = json.load(f)
+        
+            wh, zab1, zab2 = data[str(key)]
+        
+            if zab1 >= 0:
+                self.zaber_v.move_abs(zab1)
+        
+            if zab2 >= 0:
+                self.zaber_h.move_abs(zab2)
+            
+            self.newport.move_abs(wh) # Move to the desired mask position
+        else:
+            mask = int(key)
+            self.newport.move_abs(self.newport_home + (mask-1)*60) # Move to the desired mask position
         
     #--------------------------------------------------------------------------
         
@@ -204,14 +213,14 @@ class PupilMask():
         
         return wheel, zab1, zab2
     
-    def save_pos(self, mask, config_file):
+    def save_pos(self, key:str, config_file:str):
         """
         Save position of the wheel and the two zabers into a json file.
 
         Parameters
         ----------
-        mask : int
-            Key of the field of the json field to fill, it matches a preset position of the wheel in the json file.
+        key : str
+            Key at which saving the configuration.
         config_file : str
             Name of the json file.
 
@@ -220,7 +229,7 @@ class PupilMask():
         with open(config_file, 'r') as f:
             config = json.load(f)
             
-        config[str(mask)] = list(self.get_pos())
+        config[key] = list(self.get_pos())
         
         with open(config_file, 'w') as f:
             json.dump(config, f)
