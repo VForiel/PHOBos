@@ -31,7 +31,7 @@ class PupilMask():
     def __init__(
             self,
             # On which ports the components are connected
-            zaber_port:str = "/dev/ttyUSB0",
+            zaber_port:str = "/dev/ttyUSB2",
             newport_port:str = "/dev/ttyUSB1",
             zaber_h_home:int = 188490, # Horizontal axis home position (steps)
             zaber_v_home:int = 154402, # Vertical axis home position (steps)

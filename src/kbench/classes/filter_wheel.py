@@ -2,7 +2,7 @@ import serial
 import time
 
 class FilterWheel():
-    def __init__(self, filter_port:str = "/dev/ttyUSB2"):
+    def __init__(self, filter_port:str = "/dev/ttyUSB0"):
         """
         CLass to control the Thorlabs filter wheel. The wheel has 6 positions:
             - 1: ND?
