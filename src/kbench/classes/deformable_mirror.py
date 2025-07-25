@@ -35,16 +35,16 @@ class DM():
 
         # Ensure that the DM is not already in use
         for dm in DM._all:
-            if dm._serial_number == serial_number:
+            if dm.serial_number == serial_number:
                 raise ValueError(f"DM with serial number {serial_number} already exists.")
         DM._all.append(self)
 
-        self._serial_number = serial_number
+        self.serial_number = serial_number
 
         # Initialize the DM with the given serial number
         self.bmcdm = bmc.BmcDm()
-        self.bmcdm.open_dm(self._serial_number)
-        self._segments = [Segment(self, i) for i in range(169)]
+        self.bmcdm.open_dm(self.serial_number)
+        self.segments = [Segment(self, i) for i in range(169)]
 
         # Set the initial configuration of the DM
         try:
@@ -55,24 +55,6 @@ class DM():
                 segment.set_ptt(0, 0, 0)
 
         time.sleep(stabilization_time)
-
-    # Properties ------------------------------------------------------------
-
-    @property
-    def serial_number(self) -> str:
-        return self._serial_number
-    
-    @serial_number.setter
-    def serial_number(self, _):
-        raise AttributeError("Serial number is read-only and cannot be modified.")
-    
-    @property
-    def segments(self) -> list['Segment']:
-        return self._segments
-    
-    @segments.setter
-    def segments(self, _):
-        raise AttributeError("Segments are read-only and cannot be modified.")
 
     #  Specific methods -------------------------------------------------------
 
@@ -119,7 +101,7 @@ class DM():
         Close the DM connection when the object is deleted.
         """
         self.bmcdm.close_dm()
-        print(f"DM with serial number {self._serial_number} closed.")
+        print(f"DM with serial number {self.serial_number} closed.")
         DM._all.remove(self)
 
     #Config -------------------------------------------------------------------
@@ -135,7 +117,7 @@ class DM():
         """
 
         config = {
-            "serial_number": self._serial_number,
+            "serial_number": self.serial_number,
             "segments": {}
         }
 
@@ -211,21 +193,12 @@ class Segment():
         self.dm = dm
         self.id = id
 
-        self._piston = 0
-        self._tip = 0
-        self._tilt = 0
+        self.piston = 0
+        self.tip = 0
+        self.tilt = 0
 
     # piston ------------------------------------------------------------------
 
-    @property
-    def piston(self) -> float:
-        return self.get_piston()
-    
-    @piston.setter
-    def piston(self, value: float):
-        self.set_piston(value)
-        
-    
     def set_piston(self, value) -> str:
         """
         Set the piston value of the segment.
@@ -240,7 +213,7 @@ class Segment():
         str
             The response of the mirror.
         """
-        self._piston = value
+        self.piston = value
         return self.dm.bmcdm.set_segment(self.id, value, self.tip, self.tilt, True, True)
     
     def get_piston(self) -> float:
@@ -252,7 +225,7 @@ class Segment():
         float
             The piston value of the segment in nm.
         """
-        return self._piston
+        return self.piston
 
     def get_piston_range(self) -> list[float]:
         """
@@ -266,14 +239,6 @@ class Segment():
         return self.dm.bmcdm.get_segment_range(self.id, bmc.DM_Piston, self.piston, self.tip, self.tilt, True)
 
     # tip ---------------------------------------------------------------------
-
-    @property
-    def tip(self) -> float:
-        return self.get_tip()
-    
-    @tip.setter
-    def tip(self, value: float) -> None:
-        self.set_tip(value)
 
     def set_tip(self, value: float) -> str:
         """
@@ -290,7 +255,7 @@ class Segment():
             The response of the mirror.
         """
         value = value / 1000.
-        self._tip = value
+        self.tip = value
         return self.dm.bmcdm.set_segment(self.id, self.piston, value, self.tilt, True, True)
 
     def get_tip(self) -> float:
@@ -302,7 +267,7 @@ class Segment():
         float
             The tip value of the segment in milliradians.
         """
-        return self._tip
+        return self.tip
 
     def get_tip_range(self) -> list[float]:
         """
@@ -316,14 +281,6 @@ class Segment():
         return self.dm.bmcdm.get_segment_range(self.id, bmc.DM_XTilt, self.piston, self.tip, self.tilt, True)
 
     # tilt --------------------------------------------------------------------
-
-    @property
-    def tilt(self) -> float:
-        return self.get_tilt()
-    
-    @tilt.setter
-    def tilt(self, value: float) -> None:
-        self.set_tilt(value)
 
     def set_tilt(self, value: float) -> str:
         """
@@ -340,7 +297,7 @@ class Segment():
             The response of the mirror.
         """
         value = value / 1000.
-        self._tilt = value
+        self.tilt = value
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
 
     def get_tilt(self) -> float:
@@ -352,7 +309,7 @@ class Segment():
         float
             The tilt value of the segment in milliradians.
         """
-        return self._tilt
+        return self.tilt
 
     def get_tilt_range(self) -> list[float]:
         """
@@ -391,9 +348,9 @@ class Segment():
         """
         tip = tip / 1000.
         tilt = tilt / 1000.
-        self._piston = piston
-        self._tip = tip
-        self._tilt = tilt
+        self.piston = piston
+        self.tip = tip
+        self.tilt = tilt
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)        
 
     def get_ptt(self) -> tuple[float]:
