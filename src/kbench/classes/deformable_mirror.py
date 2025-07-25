@@ -54,6 +54,9 @@ class DM():
             for segment in self.segments:
                 segment.set_ptt(0, 0, 0)
 
+        # Pré-alloquer des structures de données réutilisables
+        self._temp_config = {"serial_number": "", "segments": {}}
+
         time.sleep(stabilization_time)
 
     #  Specific methods -------------------------------------------------------
@@ -178,6 +181,8 @@ class Segment():
         The tilt value of the segment in milliradians.
     """
 
+    __slots__ = ['dm', 'id', 'piston', 'tip', 'tilt']
+    
     def __init__(self, dm:DM, id:int):
         """
         Initialize the segment with the given DM and ID.
@@ -254,9 +259,8 @@ class Segment():
         str
             The response of the mirror.
         """
-        value = value / 1000.
-        self.tip = value
-        return self.dm.bmcdm.set_segment(self.id, self.piston, value, self.tilt, True, True)
+        self.tip = value / 1000.0
+        return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
 
     def get_tip(self) -> float:
         """
@@ -267,7 +271,7 @@ class Segment():
         float
             The tip value of the segment in milliradians.
         """
-        return self.tip
+        return self.tip * 1000.0
 
     def get_tip_range(self) -> list[float]:
         """
@@ -296,8 +300,7 @@ class Segment():
         str
             The response of the mirror.
         """
-        value = value / 1000.
-        self.tilt = value
+        self.tilt = value / 1000.0
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
 
     def get_tilt(self) -> float:
@@ -309,7 +312,7 @@ class Segment():
         float
             The tilt value of the segment in milliradians.
         """
-        return self.tilt
+        return self.tilt * 1000.0
 
     def get_tilt_range(self) -> list[float]:
         """
