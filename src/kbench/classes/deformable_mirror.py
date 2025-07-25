@@ -101,14 +101,6 @@ class DM():
         Segment
             The segment at the given index.
         """
-        try:
-            index = int(index)
-        except ValueError:
-            raise TypeError("Index must be an integer.")
-        
-        if index < 0 or index >= len(self.segments):
-            raise IndexError("Index out of range.")
-        
         return self.segments[index]
     
     def __len__(self) -> int:
