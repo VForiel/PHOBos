@@ -54,9 +54,6 @@ class DM():
             for segment in self.segments:
                 segment.set_ptt(0, 0, 0)
 
-        # Pré-alloquer des structures de données réutilisables
-        self._temp_config = {"serial_number": "", "segments": {}}
-
         time.sleep(stabilization_time)
 
     #  Specific methods -------------------------------------------------------
@@ -356,7 +353,7 @@ class Segment():
         self.tilt = tilt
         return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)        
 
-    def get_ptt(self) -> tuple[float]:
+    def get_ptt(self) -> tuple[float, float, float]:
         """
         Get the tip-tilt value of the segment.
 
@@ -370,4 +367,5 @@ class Segment():
             The tilt value of the segment in milliradians.
         """
         
-        return self.piston, self.tip, self.tilt
+        # Conversion inline plus rapide que des appels de méthode
+        return self.piston, self.tip * 1000.0, self.tilt * 1000.0
