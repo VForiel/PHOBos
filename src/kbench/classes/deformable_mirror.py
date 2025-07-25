@@ -67,8 +67,7 @@ class DM():
         Segment
             The segments of the DM.
         """
-        for segment in self.segments:
-            yield segment
+        return iter(self.segments)
 
     def __getitem__(self, index) -> 'Segment':
         """
