@@ -1,7 +1,7 @@
-# Zaber
+# Filter Wheel
 
 ```{eval-rst}
-.. autoclass:: kbench.Kernel
+.. autoclass:: kbench.FilterWheel
    :members:
    :show-inheritance:
 ```
