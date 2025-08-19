@@ -5,4 +5,7 @@ class Kernel():
     """
 
     def __init__(self):
+        """
+        ⚠️ Not implemented yet
+        """
         ...

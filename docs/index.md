@@ -6,6 +6,8 @@
 :maxdepth: 2
 
 bench_overview
-pupil_mask
 deformable_mirror
+filter_wheel
+kernel
+pupil_mask
 ```
