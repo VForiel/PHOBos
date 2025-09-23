@@ -10,4 +10,5 @@ deformable_mirror
 filter_wheel
 kernel
 pupil_mask
+configuration_file
 ```
