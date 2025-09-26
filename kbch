@@ -1,3 +1,18 @@
 #!/bin/bash
+# Obtenir le répertoire du script de manière plus robuste
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Vérifier que Python3 est disponible
+if ! command -v python3 &> /dev/null; then
+    echo "Erreur: python3 n'est pas installé ou n'est pas dans le PATH"
+    exit 1
+fi
+
+# Vérifier que le script Python existe
+if [[ ! -f "$SCRIPT_DIR/scripts/cli_linux.py" ]]; then
+    echo "Erreur: $SCRIPT_DIR/scripts/cli_linux.py n'existe pas"
+    exit 1
+fi
+
+# Exécuter le script Python avec tous les arguments
 python3 "$SCRIPT_DIR/scripts/cli_linux.py" "$@"

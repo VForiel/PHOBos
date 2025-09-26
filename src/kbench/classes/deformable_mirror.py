@@ -1,8 +1,8 @@
 import numpy as np
-import bmc
 import os
 import json
 import time
+from .. import bmc, SANDBOX_MODE
 
 class DM():
     """
@@ -35,16 +35,19 @@ class DM():
 
         # Ensure that the DM is not already in use
         for dm in DM._all:
-            if dm.serial_number == serial_number:
+            if dm._serial_number == serial_number:
                 raise ValueError(f"DM with serial number {serial_number} already exists.")
         DM._all.append(self)
 
-        self.serial_number = serial_number
+        self._serial_number = serial_number
 
         # Initialize the DM with the given serial number
         self.bmcdm = bmc.BmcDm()
-        self.bmcdm.open_dm(self.serial_number)
-        self.segments = [Segment(self, i) for i in range(169)]
+        self.bmcdm.open_dm(self._serial_number)
+        self._segments = [Segment(self, i) for i in range(169)]
+
+        if SANDBOX_MODE:
+            print(f"⛱️ [SANDBOX] DM {serial_number} initialized with {len(self._segments)} segments")
 
         # Set the initial configuration of the DM
         try:
@@ -54,7 +57,29 @@ class DM():
             for segment in self.segments:
                 segment.set_ptt(0, 0, 0)
 
-        time.sleep(stabilization_time)
+        # In sandbox mode, no need to wait for stabilization
+        if not SANDBOX_MODE:
+            time.sleep(stabilization_time)
+        else:
+            print(f"⛱️ [SANDBOX] Skipping {stabilization_time}s stabilization wait")
+
+    # Properties ------------------------------------------------------------
+
+    @property
+    def serial_number(self) -> str:
+        return self._serial_number
+    
+    @serial_number.setter
+    def serial_number(self, _):
+        raise AttributeError("Serial number is read-only and cannot be modified.")
+    
+    @property
+    def segments(self) -> list['Segment']:
+        return self._segments
+    
+    @segments.setter
+    def segments(self, _):
+        raise AttributeError("Segments are read-only and cannot be modified.")
 
     #  Specific methods -------------------------------------------------------
 
@@ -82,6 +107,14 @@ class DM():
         Segment
             The segment at the given index.
         """
+        try:
+            index = int(index)
+        except ValueError:
+            raise TypeError("Index must be an integer.")
+        
+        if index < 0 or index >= len(self.segments):
+            raise IndexError("Index out of range.")
+        
         return self.segments[index]
     
     def __len__(self) -> int:
@@ -100,7 +133,10 @@ class DM():
         Close the DM connection when the object is deleted.
         """
         self.bmcdm.close_dm()
-        print(f"DM with serial number {self.serial_number} closed.")
+        if SANDBOX_MODE:
+            print(f"⛱️ [SANDBOX] DM {self._serial_number} object deleted")
+        else:
+            print(f"DM with serial number {self._serial_number} closed.")
         DM._all.remove(self)
 
     #Config -------------------------------------------------------------------
@@ -129,7 +165,11 @@ class DM():
 
         with open(path, 'w') as f:
             json.dump(config, f, indent=4)
-        print(f"Configuration saved to {path}")
+        
+        if SANDBOX_MODE:
+            print(f"⛱️ [SANDBOX] Configuration would be saved to {path}")
+        else:
+            print(f"Configuration saved to {path}")
 
     def load_config(self, config_path:str = _default_config_path):
         """
@@ -144,13 +184,22 @@ class DM():
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Config file not found: {config_path}")
         
-        print(f"Loading config file: {config_path}.")
+        if SANDBOX_MODE:
+            print(f"⛱️ [SANDBOX] Loading config file: {config_path}")
+        else:
+            print(f"Loading config file: {config_path}.")
         
         with open(config_path, 'r') as f:
             config = json.load(f)
         
         for segment_id, segment_config in config["segments"].items():
             segment = self.segments[int(segment_id)]
+            segment.set_ptt(segment_config["piston"], segment_config["tip"], segment_config["tilt"])
+        
+        if SANDBOX_MODE:
+            print("⛱️ [SANDBOX] Configuration loaded")
+        else:
+            print("Configuration loaded")
             segment.set_ptt(segment_config["piston"], segment_config["tip"], segment_config["tilt"])
         
         print("Configuration loaded")
