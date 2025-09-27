@@ -9,8 +9,8 @@ except ImportError:
     print("❌ BMC lib not found. Install it via the BMC SDK.")
     print("⛱️ Running in sandbox mode.")
 
-# Make bmc and SANDBOX_MODE available for other modules
-__all__ = ['bmc', 'SANDBOX_MODE']
+# Import classes
+from .classes import PupilMask, FilterWheel, DM
 
-from .classes import *
-from .modules import *
+# Make bmc, SANDBOX_MODE and classes available for other modules
+__all__ = ['bmc', 'SANDBOX_MODE', 'PupilMask', 'FilterWheel', 'DM']

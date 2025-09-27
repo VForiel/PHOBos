@@ -53,6 +53,12 @@ def main():
         control_mask(sys.argv[2:])
         sys.exit(0)
 
+    # Filter wheel ------------------------------------------------------------
+
+    if sys.argv[1] in ['filter']:   
+        control_filter(sys.argv[2:])
+        sys.exit(0)
+
     # Invalid equipment -------------------------------------------------------
 
     print(f"❌ Error: Invalid equipment '{sys.argv[1]}'.")
@@ -73,11 +79,21 @@ def show_help():
 
     print("\nOptions:")
     print("  --help, -h     Show this help message")
-    print("  --version, -v  Show version information (soon)")
+    print("  --version, -v  Show version information")
 
 def show_version():
-    print("😅 Not implemented yet")
-    pass
+    # Get the version from the ../pyproject.toml file
+    try:
+        import toml
+        pyproject_file = os.path.join(os.path.dirname(__file__), '..', 'pyproject.toml')
+        with open(pyproject_file, 'r') as f:
+            pyproject = toml.load(f)
+        version = pyproject['project']['version']
+        print(f"ℹ️ kbench version {version}")
+    except Exception as e:
+        print("❌ Error: Could not retrieve version information.")
+        print(f"ℹ️ {e}")
+        sys.exit(1)
 
 def get_config_file_path():
     if 'config_path' in CONFIG:
@@ -173,6 +189,7 @@ def control_mask(args):
             masks[int(key)] = value['name']
 
     else:
+        config = None
         masks = {
             'dot':{
                 'x': 0,
@@ -260,8 +277,8 @@ def control_mask(args):
         print(f'⌛ Setting "{mask}" mask...')
         
         p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'],
-            zaber_port=config['mask']['ports']['zaber']
+            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
+            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
         )
 
         if config:
@@ -281,8 +298,8 @@ def control_mask(args):
         print(f"⌛ Moving mask...")
 
         p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'],
-            zaber_port=config['mask']['ports']['zaber']
+            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
+            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
         )
 
         try:
@@ -301,7 +318,7 @@ def control_mask(args):
         elif args[0] == 'mvv':
             p.move_v(int(value), abs=abs)
         elif args[0] == 'mva':
-            p.move_a(value, abs=abs)
+            p.rotate(value, abs=abs)
 
         print("✅ Done")
         sys.exit(0)
