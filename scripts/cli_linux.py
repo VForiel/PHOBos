@@ -86,7 +86,9 @@ def show_help():
     
     print("\n💡 Examples:")
     print("  kbch mask set 3           # Rotate mask to 180° (3×60°)")
+    print("  kbch mask get             # Show current mask position")
     print("  kbch filter set 2         # Move filter wheel to slot 2")
+    print("  kbch filter get           # Show current filter position")
     print("  kbch config create.yml    # Create new configuration")
     
     print("\n📖 For detailed help on specific equipment:")
@@ -202,6 +204,76 @@ def control_config(args):
             print(f"Current config file: {CONFIG['config_path']}")
         else:
             print("🫤 No configuration file set.")
+        sys.exit(0)
+
+    # Create ------------------------------------------------------------------
+
+    if args[0] in ['create']:
+        if len(args) < 2:
+            print("❌ Error: No config file path provided.")
+            print("ℹ️ Usage: kbch config create [path]")
+            sys.exit(1)
+        
+        config_file_path = args[1]
+        
+        # Check if path ends with .yml or .yaml
+        if not (config_file_path.endswith('.yml') or config_file_path.endswith('.yaml')):
+            print("❌ Error: Configuration file must have .yml or .yaml extension.")
+            sys.exit(1)
+        
+        # Check if file already exists
+        if os.path.exists(config_file_path):
+            response = input(f"⚠️  File '{config_file_path}' already exists. Overwrite? (y/N): ")
+            if response.lower() != 'y':
+                print("❌ Operation cancelled.")
+                sys.exit(1)
+        
+        print("🔧 Creating new configuration file...")
+        print("📝 Please provide the following information:")
+        
+        # Get mask configuration
+        print("\n📐 Mask Configuration:")
+        newport_port = input("  Newport port (default: /dev/ttyUSB0): ").strip() or "/dev/ttyUSB0"
+        zaber_port = input("  Zaber port (default: /dev/ttyUSB1): ").strip() or "/dev/ttyUSB1"
+        
+        # Get filter configuration
+        print("\n🔍 Filter Configuration:")
+        filter_port = input("  Filter wheel port (default: /dev/ttyUSB2): ").strip() or "/dev/ttyUSB2"
+        
+        # Create configuration structure
+        config = {
+            'mask': {
+                'ports': {
+                    'newport': newport_port,
+                    'zaber': zaber_port
+                },
+                'slots': {}
+            },
+            'filter': {
+                'port': filter_port,
+                'slots': {}
+            }
+        }
+        
+        # Write configuration file
+        try:
+            with open(config_file_path, 'w') as f:
+                yaml.safe_dump(config, f, default_flow_style=False, indent=2)
+            
+            print(f"✅ Configuration file created: {config_file_path}")
+            
+            # Ask if user wants to set it as active config
+            response = input("🔗 Set this as the active configuration? (Y/n): ")
+            if response.lower() != 'n':
+                CONFIG['config_path'] = os.path.abspath(config_file_path)
+                with open(CONFIG_FILE, "w") as f:
+                    json.dump(CONFIG, f, indent=4)
+                print("✅ Configuration set as active.")
+            
+        except Exception as e:
+            print(f"❌ Error creating configuration file: {e}")
+            sys.exit(1)
+        
         sys.exit(0)
 
     # Mask management ---------------------------------------------------------
@@ -475,6 +547,7 @@ def control_mask(args):
     def show_help():
         print("📐 MASK CONTROL - Pupil Mask Management")
         print("="*45)
+        print("Usage: kbch mask get")
         print("Usage: kbch mask set [mask]")
         print("       kbch mask move <axis> [value] [options]")
         print("       kbch mask [options]")
@@ -587,6 +660,27 @@ def control_mask(args):
         print("✅ Done")
         sys.exit(0)
 
+    # Get position ------------------------------------------------------------
+
+    if args[0] in ['get']:
+        print("⌛ Getting current mask position...")
+        
+        p = kbench.PupilMask(
+            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
+            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
+        )
+        
+        # Get current positions
+        # get_pos() returns (wheel_angle, zaber_vertical, zaber_horizontal)
+        wheel_pos, zab_v_pos, zab_h_pos = p.get_pos()
+        
+        print(f"📐 Current mask position:")
+        print(f"  🔄 Wheel angle: {wheel_pos}°")
+        print(f"  ↔️  Horizontal (X): {zab_h_pos} steps")
+        print(f"  ↕️  Vertical (Y): {zab_v_pos} steps")
+        
+        sys.exit(0)
+
     # Move --------------------------------------------------------------------
 
     if args[0] in ['mvh', 'mvv', 'mva']:
@@ -638,6 +732,7 @@ def control_filter(args):
     def show_help():
         print("🔍 FILTER CONTROL - Filter Wheel Management")
         print("="*45)
+        print("       kbch filter get")
         print("Usage: kbch filter set [slot|name]")
         print("       kbch filter [options]")
         
@@ -681,6 +776,30 @@ def control_filter(args):
 
     if args[0] in ['--list', '-l']:
         show_available_slots()
+        sys.exit(0)
+
+    # Get position ------------------------------------------------------------
+
+    if args[0] in ['get']:
+        print("⌛ Getting current filter position...")
+        
+        if is_config_set():
+            config = get_config()
+            fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
+        else:
+            fw = kbench.FilterWheel()
+        
+        current_slot = fw.get_pos()
+        
+        print(f"🔍 Current filter position: slot {current_slot}")
+        
+        # If there are configured filters, show which one matches
+        if filters:
+            matching_filters = [name for name, filter_config in filters.items() 
+                              if filter_config.get('slot') == current_slot]
+            if matching_filters:
+                print(f"  📝 Configured filter(s): {', '.join(matching_filters)}")
+        
         sys.exit(0)
 
     # Set ---------------------------------------------------------------------
