@@ -2,8 +2,6 @@ import sys
 import os
 import json
 import yaml
-import glob
-import re
 
 try:
     import kbench
@@ -14,40 +12,7 @@ except ImportError:
 CONFIG_FILE = os.path.expanduser("~/.kbch.json")
 if os.path.isfile(CONFIG_FILE):
     with open(CONFIG_FILE, "r") as f:
-       def show_conf    def show_config_help():
-        print("Usage: kbch config [path]")
-        print("       kbch config create [path]")
-        print("       kbch config [options]")
-        print("       kbch config mask [add|remove|list] [name]")
-        print("       kbch config filter [add|remove|list] [name]")
-        print("\\nOptions:")
-        print("  --help, -h     Show this help message")
-        print("  --reset, -r    Reset configuration to default")
-        print("  --show, -s     Show current configuration")
-        print("  create [path]  Create a new configuration file interactively")
-        print("\\nMask/Filter management:")
-        print("  mask add [name]     Add current mask position to config")
-        print("  mask remove [name]  Remove mask from config")
-        print("  mask list           List all configured masks")
-        print("  filter add [name]   Add current filter position to config")
-        print("  filter remove [name] Remove filter from config")
-        print("  filter list         List all configured filters")   print("Usage: kbch config [path]")
-        print("       kbch config create [path]")
-        print("       kbch config [options]")
-        print("       kbch config mask [add|remove|list] [name]")
-        print("       kbch config filter [add|remove|list] [name]")
-        print("\\nOptions:")
-        print("  --help, -h     Show this help message")
-        print("  --reset, -r    Reset configuration to default")
-        print("  --show, -s     Show current configuration")
-        print("  create [path]  Create a new configuration file interactively")
-        print("\\nMask/Filter management:")
-        print("  mask add [name]     Add current mask position to config")
-        print("  mask remove [name]  Remove mask from config")
-        print("  mask list           List all configured masks")
-        print("  filter add [name]   Add current filter position to config")
-        print("  filter remove [name] Remove filter from config")
-        print("  filter list         List all configured filters")
+        CONFIG = json.load(f)
 else:
     CONFIG = {}
 
@@ -104,17 +69,28 @@ def main():
 #==============================================================================
 
 def show_help():
-    print("Usage: kbch [equipment] [options | command]")
-    print("       kbch config [options | command]")
-    print("       kbch [options]")
-
-    print("\nAvailable equipment:")
-    print("  - mask")
-    print("  - filter")
-
-    print("\nOptions:")
-    print("  --help, -h     Show this help message")
-    print("  --version, -v  Show version information")
+    print("📋 KBENCH - Kernel Bench Control Interface")
+    print("="*50)
+    print("Usage: kbch [equipment] [command] [options]")
+    print("       kbch config [command] [options]")
+    print("       kbch [global-options]")
+    
+    print("\n🔧 Available Equipment:")
+    print("  mask     Control pupil mask (rotation + positioning)")
+    print("  filter   Control filter wheel (slot selection)")
+    print("  config   Manage configuration files and settings")
+    
+    print("\n⚙️  Global Options:")
+    print("  -h, --help     Show this help message and exit")
+    print("  -v, --version  Show version information and exit")
+    
+    print("\n💡 Examples:")
+    print("  kbch mask set 3           # Rotate mask to 180° (3×60°)")
+    print("  kbch filter set 2         # Move filter wheel to slot 2")
+    print("  kbch config create.yml    # Create new configuration")
+    
+    print("\n📖 For detailed help on specific equipment:")
+    print("  kbch [equipment] --help   # e.g., kbch mask --help")
 
 def show_version():
     # Get the version from the ../pyproject.toml file
@@ -148,180 +124,6 @@ def get_config():
         config = yaml.safe_load(f)
     return config
 
-def get_available_usb_ports():
-    """
-    Récupère la liste des ports USB disponibles sur le système.
-    
-    Returns
-    -------
-    list
-        Liste des ports USB trouvés (/dev/ttyUSB*, /dev/ttyACM*)
-    """
-    usb_ports = []
-    
-    # Chercher les ports ttyUSB
-    usb_ports.extend(glob.glob('/dev/ttyUSB*'))
-    
-    # Chercher les ports ttyACM (certains Arduino/microcontrôleurs)
-    usb_ports.extend(glob.glob('/dev/ttyACM*'))
-    
-    # Trier naturellement (ttyUSB0, ttyUSB1, etc.)
-    def natural_sort_key(text):
-        return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text)]
-    
-    return sorted(usb_ports, key=natural_sort_key)
-
-def interactive_port_selection(prompt, default_port=None):
-    """
-    Demande à l'utilisateur de sélectionner un port USB de manière interactive.
-    
-    Parameters
-    ----------
-    prompt : str
-        Message à afficher à l'utilisateur
-    default_port : str, optional
-        Port par défaut si l'utilisateur appuie sur Entrée
-        
-    Returns
-    -------
-    str
-        Port USB sélectionné
-    """
-    available_ports = get_available_usb_ports()
-    
-    print(f"\n{prompt}")
-    
-    if not available_ports:
-        print("⚠️  Aucun port USB détecté sur le système.")
-        if default_port:
-            port = input(f"Entrez le port manuellement (défaut: {default_port}): ").strip()
-            return port if port else default_port
-        else:
-            return input("Entrez le port manuellement: ").strip()
-    
-    print("Ports USB disponibles:")
-    for i, port in enumerate(available_ports, 1):
-        print(f"  {i}. {port}")
-    
-    if default_port and default_port not in available_ports:
-        print(f"  m. Saisie manuelle (défaut: {default_port})")
-    else:
-        print("  m. Saisie manuelle")
-    
-    while True:
-        if default_port:
-            choice = input(f"Sélectionnez un port [1-{len(available_ports)}, m] (défaut: {default_port}): ").strip()
-        else:
-            choice = input(f"Sélectionnez un port [1-{len(available_ports)}, m]: ").strip()
-        
-        if not choice and default_port:
-            return default_port
-        
-        if choice.lower() == 'm':
-            port = input("Entrez le port manuellement: ").strip()
-            if port:
-                return port
-            continue
-        
-        try:
-            index = int(choice) - 1
-            if 0 <= index < len(available_ports):
-                return available_ports[index]
-            else:
-                print("❌ Sélection invalide. Veuillez réessayer.")
-        except ValueError:
-            print("❌ Sélection invalide. Veuillez réessayer.")
-
-def create_config_interactive(config_path):
-    """
-    Crée un fichier de configuration de manière interactive.
-    
-    Parameters
-    ----------
-    config_path : str
-        Chemin du fichier de configuration à créer
-    """
-    print("🔧 Création d'un nouveau fichier de configuration")
-    print("=" * 50)
-    
-    config = {
-        'mask': {
-            'ports': {},
-            'slots': {}
-        },
-        'filter': {
-            'port': '',
-            'slots': {}
-        }
-    }
-    
-    # Configuration des masques
-    print("\n📐 Configuration du masque pupillaire")
-    print("Le masque utilise deux équipements :")
-    print("  - Newport : contrôle de rotation du masque")
-    print("  - Zaber : contrôle des axes X et Y")
-    
-    config['mask']['ports']['newport'] = interactive_port_selection(
-        "Sélectionnez le port pour le moteur Newport (rotation) :",
-        "/dev/ttyUSB0"
-    )
-    
-    config['mask']['ports']['zaber'] = interactive_port_selection(
-        "Sélectionnez le port pour les moteurs Zaber (axes X/Y) :",
-        "/dev/ttyUSB1"
-    )
-    
-    # Configuration du filtre
-    print("\n🔍 Configuration de la roue à filtres")
-    config['filter']['port'] = interactive_port_selection(
-        "Sélectionnez le port pour la roue à filtres :",
-        "/dev/ttyUSB2"
-    )
-    
-    # Vérifier les conflits de ports
-    used_ports = [
-        config['mask']['ports']['newport'],
-        config['mask']['ports']['zaber'],
-        config['filter']['port']
-    ]
-    
-    if len(set(used_ports)) != len(used_ports):
-        print("\n⚠️  ATTENTION: Vous avez assigné le même port à plusieurs équipements.")
-        print("Ports utilisés:")
-        for equipment, port in [
-            ("Newport (masque)", config['mask']['ports']['newport']),
-            ("Zaber (masque)", config['mask']['ports']['zaber']),
-            ("Filtre", config['filter']['port'])
-        ]:
-            print(f"  {equipment}: {port}")
-        
-        confirm = input("Voulez-vous continuer quand même ? [y/N]: ").strip().lower()
-        if confirm not in ['y', 'yes', 'o', 'oui']:
-            print("❌ Création annulée.")
-            return False
-    
-    # Créer le répertoire parent si nécessaire
-    os.makedirs(os.path.dirname(os.path.abspath(config_path)), exist_ok=True)
-    
-    # Écrire le fichier de configuration
-    try:
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False, indent=2, sort_keys=False)
-        
-        print(f"\n✅ Fichier de configuration créé avec succès : {config_path}")
-        print("\nRésumé de la configuration :")
-        print(f"  Newport (masque) : {config['mask']['ports']['newport']}")
-        print(f"  Zaber (masque)   : {config['mask']['ports']['zaber']}")
-        print(f"  Filtre           : {config['filter']['port']}")
-        print("\n💡 Vous pouvez maintenant utiliser cette configuration avec :")
-        print(f"   kbch config {config_path}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erreur lors de la création du fichier : {e}")
-        return False
-
 #==============================================================================
 # Config
 #==============================================================================
@@ -329,21 +131,36 @@ def create_config_interactive(config_path):
 def control_config(args):
 
     def show_config_help():
+        print("⚙️  CONFIGURATION - Settings Management")
+        print("="*45)
         print("Usage: kbch config [path]")
-        print("       kbch config [options]")
-        print("       kbch config mask [add|remove|list] [name]")
-        print("       kbch config filter [add|remove|list] [name]")
-        print("\nOptions:")
-        print("  --help, -h     Show this help message")
-        print("  --reset, -r    Reset configuration to default")
-        print("  --show, -s     Show current configuration")
-        print("\nMask/Filter management:")
-        print("  mask add [name]     Add current mask position to config")
-        print("  mask remove [name]  Remove mask from config")
-        print("  mask list           List all configured masks")
-        print("  filter add [name]   Add current filter position to config")
-        print("  filter remove [name] Remove filter from config")
-        print("  filter list         List all configured filters")
+        print("       kbch config create [path]")
+        print("       kbch config [command] [options]")
+        print("       kbch config [equipment] [action] [name]")
+        
+        print("\n📁 File Management:")
+        print("  [path]         Set active configuration file (.yml/.json)")
+        print("  create [path]  Create new configuration interactively")
+        
+        print("\n📋 Information:")
+        print("  -s, --show     Show current configuration file path")
+        print("  -h, --help     Show this help message")
+        print("  -r, --reset    Reset to default (no configuration)")
+        
+        print("\n📐 Mask Management:")
+        print("  mask add [name]     Save current mask position with name")
+        print("  mask remove [name]  Remove saved mask configuration")
+        print("  mask list           Show all configured mask positions")
+        
+        print("\n🔍 Filter Management:")
+        print("  filter add [name]     Save current filter position with name")
+        print("  filter remove [name]  Remove saved filter configuration")
+        print("  filter list           Show all configured filter positions")
+        
+        print("\n💡 Examples:")
+        print("  kbch config create my_setup.yml    # Interactive setup")
+        print("  kbch config my_setup.yml           # Use configuration")
+        print("  kbch config mask add \"center\"       # Save current position")
 
     # Invalid command ---------------------------------------------------------
 
@@ -366,34 +183,6 @@ def control_config(args):
         with open(CONFIG_FILE, "w") as f:
             json.dump(CONFIG, f, indent=4)
         print("✅Done")
-        sys.exit(0)
-
-    # Create ------------------------------------------------------------------
-
-    if args[0] in ['create']:
-        if len(args) < 2:
-            print("❌ Error: No path provided for config creation.")
-            print("ℹ️ Usage: kbch config create [path]")
-            sys.exit(1)
-        
-        config_path = args[1]
-        
-        # Vérifier si le fichier existe déjà
-        if os.path.exists(config_path):
-            overwrite = input(f"⚠️  Le fichier {config_path} existe déjà. Voulez-vous l'écraser ? [y/N]: ").strip().lower()
-            if overwrite not in ['y', 'yes', 'o', 'oui']:
-                print("❌ Création annulée.")
-                sys.exit(1)
-        
-        # Créer la configuration interactivement
-        if create_config_interactive(config_path):
-            # Optionnellement, définir immédiatement cette config comme active
-            use_config = input("\\nVoulez-vous utiliser cette configuration maintenant ? [Y/n]: ").strip().lower()
-            if use_config not in ['n', 'no', 'non']:
-                CONFIG['config_path'] = os.path.abspath(config_path)
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(CONFIG, f, indent=4)
-                print("✅ Configuration activée !")
         sys.exit(0)
 
     # Reset -------------------------------------------------------------------
@@ -473,10 +262,9 @@ def control_mask_config(args):
         )
         
         # Get current positions
-        wheel_pos, zab_v_pos, zab_h_pos = p.get_pos()
-        x_pos = zab_h_pos
-        y_pos = zab_v_pos
-        a_pos = wheel_pos
+        x_pos = p.get_position_h()
+        y_pos = p.get_position_v()
+        a_pos = p.get_position_a()
         
         # Update config
         if 'mask' not in config:
@@ -568,10 +356,10 @@ def control_filter_config(args):
         # Get current position
         print("⌛ Reading current filter position...")
         config = get_config()
-        fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB2'))
+        fw = kbench.FilterWheel(port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
         
         # Get current position
-        current_slot = fw.get_pos()
+        current_slot = fw.get_position()
         
         # Update config
         if 'filter' not in config:
@@ -685,24 +473,47 @@ def control_mask(args):
         }
 
     def show_help():
+        print("📐 MASK CONTROL - Pupil Mask Management")
+        print("="*45)
         print("Usage: kbch mask set [mask]")
-        print("       kbch mask mvh [-a|--abs] [value (int)]")
-        print("       kbch mask mvv [-a|--abs] [value (int)]")
-        print("       kbch mask mva [-a|--abs] [value (float)]")
-        print("       kbch mask [option]")
+        print("       kbch mask move <axis> [value] [options]")
+        print("       kbch mask [options]")
+        
+        print("\n🎯 Set Commands:")
+        print("  set [mask]     Apply mask position (name or number 1-6)")
+        
+        print("\n🔄 Movement Commands:")
+        print("  mvh [value]    Move horizontally (X-axis) in steps")
+        print("  mvv [value]    Move vertically (Y-axis) in steps")
+        print("  mva [degrees]  Rotate wheel by angle in degrees")
+        
+        print("\n📋 Information:")
+        print("  -l, --list     Show all available masks")
+        print("  -h, --help     Show this help message")
+        
         show_available_masks()
-        print("\nNote: You can use numbers 1-6 to directly rotate the wheel to n*60° without")
-        print("      affecting x/y axes (overrides configuration file settings)")
-        print("\nOptions:")
-        print("  --list, -l   Show available masks")
-        print("  --help, -h   Show this help message")
+        
+        print("\n⚡ Movement Options:")
+        print("  -a, --abs      Use absolute positioning (default: relative)")
+        
+        print("\n💡 Quick Rotation (bypasses config):")
+        print("  Numbers 1-6 rotate directly to n×60° without moving X/Y axes")
+        print("  Example: 'kbch mask set 3' → 180° rotation only")
 
     def show_available_masks():
-        print("\nAvailable masks:")
-        for name in masks.keys():
-            print(f"  {name}")
-        if config:
-            print("\nDirect rotation (1-6): Bypasses config, rotates to n*60°")
+        print("\n🎭 Available Masks:")
+        if config and masks:
+            print("  📝 Configured masks:")
+            for name in masks.keys():
+                if isinstance(name, str):  # Named masks from config
+                    print(f"    {name}")
+            print("  🔢 Quick rotation (bypasses config):")
+            for i in range(1, 7):
+                print(f"    {i} → {i*60}° rotation")
+        else:
+            print("  🔢 Default positions (no config file):")
+            for i in range(1, 7):
+                print(f"    {i} → {i*60}° rotation (X=0, Y=0)")
 
     # No command --------------------------------------------------------------
 
@@ -825,22 +636,33 @@ def control_filter(args):
                 filters[name] = filter_config
     
     def show_help():
+        print("🔍 FILTER CONTROL - Filter Wheel Management")
+        print("="*45)
         print("Usage: kbch filter set [slot|name]")
-        print("       kbch filter [option]")
-        print("\nOptions:")
-        print("  --list, -l   Show available slots and configured filters")
-        print("  --help, -h   Show this help message")
+        print("       kbch filter [options]")
+        
+        print("\n🎯 Commands:")
+        print("  set [target]   Move to slot number (1-6) or configured filter name")
+        
+        print("\n📋 Information:")
+        print("  -l, --list     Show available slots and configured filters")
+        print("  -h, --help     Show this help message")
+        
+        print("\n💡 Examples:")
+        print("  kbch filter set 3           # Move to slot 3")
+        print("  kbch filter set \"ND_filter\"  # Use configured filter name")
 
     def show_available_slots():
-        print("\nAvailable slots:")
+        print("\n🎰 Available Options:")
+        print("  🔢 Slot numbers:")
         for i in range(1, 7):
-            print(f"  {i}")
+            print(f"    {i}")
         
         if filters:
-            print("\nConfigured filters:")
+            print("  📝 Configured filters:")
             for name, filter_config in filters.items():
                 slot = filter_config.get('slot', 'N/A')
-                print(f"  {name} (slot {slot})")
+                print(f"    {name} (→ slot {slot})")
 
     # No command --------------------------------------------------------------
 
@@ -890,7 +712,7 @@ def control_filter(args):
 
         if is_config_set():
             config = get_config()
-            fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB2'))
+            fw = kbench.FilterWheel(port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
         else:
             fw = kbench.FilterWheel()
         fw.move(slot)
