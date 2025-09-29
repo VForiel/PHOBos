@@ -1,6 +1,6 @@
 [project]
 name = "kbench-controls"
-version = "0.7.0"
+version = "0.7.1"
 description = "Default template for PDM package"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
