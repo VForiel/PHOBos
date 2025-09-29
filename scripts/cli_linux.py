@@ -262,9 +262,11 @@ def control_mask_config(args):
         )
         
         # Get current positions
-        x_pos = p.get_position_h()
-        y_pos = p.get_position_v()
-        a_pos = p.get_position_a()
+        # get_pos() returns (wheel_angle, zaber_vertical, zaber_horizontal)
+        wheel_pos, zab_v_pos, zab_h_pos = p.get_pos()
+        x_pos = zab_h_pos  # horizontal position in steps
+        y_pos = zab_v_pos  # vertical position in steps  
+        a_pos = wheel_pos  # wheel angle in degrees
         
         # Update config
         if 'mask' not in config:
@@ -273,7 +275,6 @@ def control_mask_config(args):
             config['mask']['slots'] = {}
             
         config['mask']['slots'][mask_name] = {
-            'name': mask_name,
             'x': x_pos,
             'y': y_pos,
             'a': a_pos
@@ -356,10 +357,10 @@ def control_filter_config(args):
         # Get current position
         print("⌛ Reading current filter position...")
         config = get_config()
-        fw = kbench.FilterWheel(port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
+        fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
         
         # Get current position
-        current_slot = fw.get_position()
+        current_slot = fw.get_pos()
         
         # Update config
         if 'filter' not in config:
@@ -368,7 +369,6 @@ def control_filter_config(args):
             config['filter']['slots'] = {}
             
         config['filter']['slots'][filter_name] = {
-            'name': filter_name,
             'slot': current_slot
         }
         
@@ -712,7 +712,7 @@ def control_filter(args):
 
         if is_config_set():
             config = get_config()
-            fw = kbench.FilterWheel(port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
+            fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
         else:
             fw = kbench.FilterWheel()
         fw.move(slot)

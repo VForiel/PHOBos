@@ -1,6 +1,6 @@
 [project]
 name = "kbench"
-version = "0.1.1"
+version = "0.7.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
