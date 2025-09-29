@@ -1,0 +1,9 @@
+mask:
+  ports:
+    newport: "/dev/ttyUSB0"
+    zaber: "/dev/ttyUSB1"
+  slots: {}
+
+filter:
+  port: "/dev/ttyUSB2"
+  slots: {}
