@@ -1,5 +1,5 @@
 [project]
-name = "kbench"
+name = "kbench-controls"
 version = "0.7.0"
 description = "Default template for PDM package"
 authors = [
