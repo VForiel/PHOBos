@@ -1,21 +1,31 @@
 [project]
-name = "Kbench"
-version = "0.2.2"
+name = "kbench"
+version = "0.7.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
     {name = "mmartinod", email = "ma.martinod@free.fr"},
+    {name = "", email = ""},
 ]
 dependencies = [
     "numpy",
     "pyserial",
+    "pyyaml",
+    "toml>=0.10.2",
 ]
-requires-python = "==3.11.*"
+requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "MIT"}
 
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [tool.pdm]
 distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = []
 
 [tool.setuptools]
 include-package-data = true
