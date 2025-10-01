@@ -549,6 +549,7 @@ def control_mask(args):
         print("="*45)
         print("Usage: kbch mask get")
         print("Usage: kbch mask set [mask]")
+        print("Usage: kbch mask home")
         print("       kbch mask move <axis> [value] [options]")
         print("       kbch mask [options]")
         
@@ -605,6 +606,20 @@ def control_mask(args):
 
     if args[0] in ['--list', '-l']:
         show_available_masks()
+        sys.exit(0)
+
+    # Home --------------------------------------------------------------------
+
+    if args[0] in ['home']:
+        print("⌛ Homing mask...")
+        
+        p = kbench.PupilMask(
+            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
+            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
+        )
+        p.newport.home_search()
+        
+        print("✅ Done")
         sys.exit(0)
 
     # Set ---------------------------------------------------------------------
