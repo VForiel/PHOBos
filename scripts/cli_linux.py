@@ -621,7 +621,7 @@ def control_mask(args):
             mask_number = int(args[1])
             if 1 <= mask_number <= 6:
                 # Use direct rotation without configuration file override
-                print(f'⌛ Setting mask to position {mask_number} (rotation: {mask_number * 60}°)...')
+                print(f'⌛ Setting mask to position {mask_number}...')
                 
                 p = kbench.PupilMask(
                     newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
@@ -629,7 +629,7 @@ def control_mask(args):
                 )
                 
                 # Only rotate the wheel, don't touch x and y axes
-                p.rotate(mask_number * 60, abs=True)
+                p.apply_mask(mask_number)
                 
                 print("✅ Done")
                 sys.exit(0)
