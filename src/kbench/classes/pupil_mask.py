@@ -39,8 +39,8 @@ class PupilMask():
     def __init__(
             self,
             # On which ports the components are connected
-            zaber_port:str = "/dev/ttyUSB2",
-            newport_port:str = "/dev/ttyUSB1",
+            zaber_port:str = "/dev/ttyUSB0",
+            newport_port:str = "/dev/ttyUSB3", # Newport device
             zaber_h_home:int = 188490, # Horizontal axis home position (steps)
             zaber_v_home:int = 154402, # Vertical axis home position (steps)
             newport_home:float = 56.15, # Angle of the pupil mask n°1 (degree)
@@ -54,7 +54,7 @@ class PupilMask():
         Parameters
         ----------
         zaber_port : str
-            Port for the Zaber motors (default is "/dev/ttyUSB0").
+            Port for the Zaber motors (default is "/dev/ttyUSB2").
         newport_port : str
             Port for the Newport motor (default is "/dev/ttyUSB1").
         zaber_h_home : int
