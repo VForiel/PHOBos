@@ -66,7 +66,7 @@ class PupilMask():
         reset : bool, optional
             If True, reset the mask to the home position on initialization. Default is False.
         """
-        
+
         # Initialize the serial connections for Zaber and Newport
         zaber_session = serial_Serial(zaber_port, 115200, timeout=0.1)
         newport_session = serial_Serial(newport_port, 921600, timeout=0.1)
