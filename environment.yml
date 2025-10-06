@@ -1,4 +1,4 @@
-name: Kbench
+name: photonics
 channels:
   - conda-forge
   - defaults
