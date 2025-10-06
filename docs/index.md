@@ -8,7 +8,7 @@
 bench_overview
 deformable_mirror
 filter_wheel
-kernel
+photonic_chip
 pupil_mask
 configuration_file
 ```

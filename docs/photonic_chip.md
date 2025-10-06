@@ -1,7 +1,7 @@
-# Kernel
+# Photonic Chip
 
 ```{eval-rst}
-.. autoclass:: kbench.Kernel
+.. autoclass:: kbench.PhotonicChip
    :members:
    :show-inheritance:
 ```
