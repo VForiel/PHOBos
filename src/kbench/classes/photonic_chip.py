@@ -15,29 +15,29 @@ class Channel:
         self.chip = chip_instance
         self.channel = channel_number
         
-    def set_current(self, current: float):
+    def set_current(self, current: float, verbose: bool = False):
         """Set current for this channel in mA."""
-        Chip.set_current(self.channel, current)
+        Chip.set_current(self.channel, current, verbose=verbose)
         
-    def set_voltage(self, voltage: float):
+    def set_voltage(self, voltage: float, verbose: bool = False):
         """Set voltage for this channel in V.""" 
-        Chip.set_voltage(self.channel, voltage)
+        Chip.set_voltage(self.channel, voltage, verbose=verbose)
         
-    def get_current(self) -> float:
+    def get_current(self, verbose: bool = False) -> float:
         """Get current for this channel in mA."""
-        return Chip.get_current(self.channel)
+        return Chip.get_current(self.channel, verbose=verbose)
         
-    def get_voltage(self) -> float:
+    def get_voltage(self, verbose: bool = False) -> float:
         """Get voltage for this channel in V."""
-        return Chip.get_voltage(self.channel)
+        return Chip.get_voltage(self.channel, verbose=verbose)
         
-    def ensure_current(self, current: float, tolerance: float = 0.1, max_attempts: int = 100):
+    def ensure_current(self, current: float, tolerance: float = 0.1, max_attempts: int = 100, verbose: bool = False):
         """Ensure current reaches target within tolerance."""
-        return Chip.ensure_current(self.channel, current, tolerance, max_attempts)
+        return Chip.ensure_current(self.channel, current, tolerance, max_attempts, verbose=verbose)
         
-    def ensure_voltage(self, voltage: float, tolerance: float = 0.01, max_attempts: int = 100):
+    def ensure_voltage(self, voltage: float, tolerance: float = 0.01, max_attempts: int = 100, verbose: bool = False):
         """Ensure voltage reaches target within tolerance."""
-        return Chip.ensure_voltage(self.channel, voltage, tolerance, max_attempts)
+        return Chip.ensure_voltage(self.channel, voltage, tolerance, max_attempts, verbose=verbose)
 
 class Chip:
     """
@@ -217,6 +217,8 @@ class Chip:
         for topa_idx, channel_num in enumerate(self.topas):
             self._channels[topa_idx + 1] = Channel(self, channel_num)
 
+        Chip.connect()
+
     @classmethod
     def connect(cls):
         if Chip.SERIAL is None:
@@ -230,7 +232,7 @@ class Chip:
             # Check connexion
             res = cls.send_command("*IDN?")
             if "XPOW" not in res:
-                raise ConnectionError(f"❌ No response from the XPOW controller on port {self.port} at {self.baudrate} bauds. Response was: {res}")
+                raise ConnectionError(f"❌ No response from the XPOW controller on port {port} at {baudrate} bauds. Response was: {res}")
         return cls.SERIAL
     
     @classmethod
@@ -248,17 +250,21 @@ class Chip:
         return self._channels[topa_index]
 
     @classmethod
-    def send_command(cls, cmd:str) -> str:
+    def send_command(cls, cmd: str, verbose: bool = False) -> str:
         # Send a command to the XPOW and return the answer
-        cmd += "\n"
+        cmd_line = cmd + "\n"
         cls.connect()
-        cls.SERIAL.write(cmd.encode())
+        if verbose:
+            print(f"📤 XPOW TX: '{cmd}'")
+        cls.SERIAL.write(cmd_line.encode())
         time.sleep(0.01)  # Wait a bit for the command to be processed
         response = cls.SERIAL.readline().decode().strip()
+        if verbose:
+            print(f"📥 XPOW RX: '{response}'")
         return response
 
     @classmethod
-    def update_coeffs(cls, plot:bool=False):
+    def update_coeffs(cls, plot: bool = False, verbose: bool = False):
         """
         Scan current and voltage for all TOPAs, query the XPOW for measured values,
         and refine CUR_COEFFS and VOLT_COEFFS by linear fitting.
@@ -276,8 +282,8 @@ class Chip:
             # Current calibration
             measured = []
             for c in test_currents:
-                cls.set_current(ch, c)
-                val = cls.get_current(ch)
+                cls.set_current(ch, c, verbose=verbose)
+                val = cls.get_current(ch, verbose=verbose)
                 measured.append(val)
             measured = np.array(measured)
             # Linear fit: measured = a * set + b
@@ -287,8 +293,8 @@ class Chip:
             # Voltage calibration
             measured_v = []
             for v in test_voltages:
-                cls.set_voltage(ch, v)
-                val = cls.get_voltage(ch)
+                cls.set_voltage(ch, v, verbose=verbose)
+                val = cls.get_voltage(ch, verbose=verbose)
                 measured_v.append(val)
             measured_v = np.array(measured_v)
             coeffs_v = np.polyfit(test_voltages, measured_v, 1)
@@ -318,80 +324,80 @@ class Chip:
         print("✅ Coefficients updated.")
 
     @classmethod
-    def set_current(cls, channel: int, current: float):
+    def set_current(cls, channel: int, current: float, verbose: bool = False):
         """Set current for a specific channel (absolute channel number)."""
         current = max(0, min(cls.MAX_CURRENT, current))  # Clamp to valid range
         current_value = current * cls.CUR_COEFFS[channel-1]
-        cls.send_command(f"CH:{channel}:CUR:{int(current_value)}")
+        cls.send_command(f"CH:{channel}:CUR:{int(current_value)}", verbose=verbose)
 
     @classmethod
-    def set_voltage(cls, channel: int, voltage: float):
+    def set_voltage(cls, channel: int, voltage: float, verbose: bool = False):
         """Set voltage for a specific channel (absolute channel number)."""
         voltage = max(0, min(cls.MAX_VOLTAGE, voltage))  # Clamp to valid range
         voltage_value = voltage * cls.VOLT_COEFFS[channel-1]
-        cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}")
+        cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}", verbose=verbose)
 
     @classmethod
-    def get_current(cls, channel: int) -> float:
+    def get_current(cls, channel: int, verbose: bool = False) -> float:
         """Get current for a specific channel (absolute channel number)."""
-        res = cls.send_command(f"CH:{channel}:VAL?")
+        res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
-        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
+        match = re.search(r'=\s*([\d\.]+)V,([\d\.]+)mA', res)
         if match:
             return float(match.group(2))
         else:
             raise ValueError(f"❌ Unable to parse current from response: {res}")
 
     @classmethod
-    def get_voltage(cls, channel: int) -> float:
+    def get_voltage(cls, channel: int, verbose: bool = False) -> float:
         """Get voltage for a specific channel (absolute channel number)."""
-        res = cls.send_command(f"CH:{channel}:VAL?")
+        res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
-        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
+        match = re.search(r'=\s*([\d\.]+)V,([\d\.]+)mA', res)
         if match:
             return float(match.group(1))
         else:
             raise ValueError(f"❌ Unable to parse voltage from response: {res}")
 
     @classmethod
-    def ensure_current(cls, channel: int, current: float, tolerance: float = 0.1, max_attempts: int = 100):
+    def ensure_current(cls, channel: int, current: float, tolerance: float = 0.1, max_attempts: int = 100, verbose: bool = False):
         """Ensure that the current setpoint is reached within the specified tolerance."""
         attempts = 0
         step_current = current
         while attempts < max_attempts:
-            measured_current = cls.get_current(channel)
+            measured_current = cls.get_current(channel, verbose=verbose)
             error = current - measured_current
             if abs(error) <= tolerance:
                 return step_current / current
             # Simple proportional step, tune factor as needed
             step = 0.5 * error
             step_current = measured_current + step
-            cls.set_current(channel, step_current)
+            cls.set_current(channel, step_current, verbose=verbose)
             attempts += 1
         if abs(error) > tolerance:
             raise RuntimeError(f"❌ Unable to reach target current {current} mA on channel {channel} within {tolerance} mA after {max_attempts} attempts.")
         
     @classmethod
-    def ensure_voltage(cls, channel: int, voltage: float, tolerance: float = 0.01, max_attempts: int = 100):
+    def ensure_voltage(cls, channel: int, voltage: float, tolerance: float = 0.01, max_attempts: int = 100, verbose: bool = False):
         """Ensure that the voltage setpoint is reached within the specified tolerance."""
         attempts = 0
         step_voltage = voltage
         while attempts < max_attempts:
-            measured_voltage = cls.get_voltage(channel)
+            measured_voltage = cls.get_voltage(channel, verbose=verbose)
             error = voltage - measured_voltage
             if abs(error) <= tolerance:
                 return step_voltage / voltage
             # Simple proportional step, tune factor as needed
             step = 0.5 * error
             step_voltage = measured_voltage + step
-            cls.set_voltage(channel, step_voltage)
+            cls.set_voltage(channel, step_voltage, verbose=verbose)
             attempts += 1
         if abs(error) > tolerance:
             raise RuntimeError(f"❌ Unable to reach target voltage {voltage} V on channel {channel} within {tolerance} V after {max_attempts} attempts.")
 
     @classmethod
-    def turn_off(cls):
+    def turn_off(cls, verbose: bool = False):
         """Turn off all channels."""
         for channel in range(1, cls.N_CHANNELS+1):
-            cls.send_command(f"CH:{channel}:CUR:0")
-            cls.send_command(f"CH:{channel}:VOLT:0")
+            cls.send_command(f"CH:{channel}:CUR:0", verbose=verbose)
+            cls.send_command(f"CH:{channel}:VOLT:0", verbose=verbose)
