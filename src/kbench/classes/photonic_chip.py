@@ -180,14 +180,15 @@ class Chip:
         self.n_inputs = self.ARCHS[arch]['n_inputs']
         self.n_outputs = self.ARCHS[arch]['n_outputs']
         self.topas = self.ARCHS[arch]['topas']
-        ...
 
     @staticmethod
     def send_command(cmd:str) -> str:
         # Send a command to the XPOW and return the answer
         cmd += "\n"
-        time.sleep(0.01)
-        ...
+        Chip.SERIAL.write(cmd.encode())
+        time.sleep(0.01)  # Wait a bit for the command to be processed
+        response = Chip.SERIAL.readline().decode().strip()
+        return response
 
     @staticmethod
     def update_coeffs(plot:bool=False):

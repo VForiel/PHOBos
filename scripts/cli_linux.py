@@ -102,7 +102,8 @@ def show_version():
         with open(pyproject_file, 'r') as f:
             pyproject = toml.load(f)
         version = pyproject['project']['version']
-        print(f"ℹ️ kbench version {version}")
+        print(f"ℹ️ kbch script version: {version}")
+        print(f"ℹ️ kbench module version: {kbench.__version__}")
     except Exception as e:
         print("❌ Error: Could not retrieve version information.")
         print(f"ℹ️ {e}")
