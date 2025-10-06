@@ -306,8 +306,8 @@ class Zaber():
         Wait for the motor to reach the target position.
         """
         position = None
-        while position != self.get():
-            position = self.get()
+        while position != (new_pos := self.get()):
+            position = new_pos
             time.sleep(0.1)
 
     #--------------------------------------------------------------------------
@@ -428,8 +428,8 @@ class Newport():
         Wait for the motor to reach the target position.
         """
         position = None
-        while position != self.get():
-            position = self.get()
+        while position != (new_pos := self.get()):
+            position = new_pos
             time.sleep(0.1)
 
     #--------------------------------------------------------------------------

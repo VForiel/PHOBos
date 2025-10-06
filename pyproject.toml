@@ -1,6 +1,6 @@
 [project]
 name = "kbench-controls"
-version = "0.7.1"
+version = "0.7.2"
 description = "Python package for controlling optical test bench equipment in kernel-nulling interferometry"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
@@ -23,9 +23,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-
-[project.scripts]
-kbch = "kbench.cli:main"
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
