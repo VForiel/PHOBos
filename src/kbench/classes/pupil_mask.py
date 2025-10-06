@@ -1,14 +1,7 @@
 import time
 import json
 import yaml
-from .. import SANDBOX_MODE
-
-# Conditional import based on mode
-if SANDBOX_MODE:
-    from ..sandbox.serial_mock import Serial as serial_Serial
-else:
-    import serial
-    serial_Serial = serial.Serial
+from .. import serial
 
 #==============================================================================
 # Pupil Mask Class
@@ -68,8 +61,8 @@ class PupilMask():
         """
 
         # Initialize the serial connections for Zaber and Newport
-        zaber_session = serial_Serial(zaber_port, 115200, timeout=0.1)
-        newport_session = serial_Serial(newport_port, 921600, timeout=0.1)
+        zaber_session = serial.Serial(zaber_port, 115200, timeout=0.1)
+        newport_session = serial.Serial(newport_port, 921600, timeout=0.1)
 
         self.zaber_h_home = zaber_h_home
         self.zaber_v_home = zaber_v_home
@@ -79,9 +72,6 @@ class PupilMask():
         self.zaber_v = Zaber(zaber_session, 1)
         self.zaber_h = Zaber(zaber_session, 2)
         self.newport = Newport(newport_session)
-
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] PupilMask initialized - Zaber:{zaber_port}, Newport:{newport_port}")
 
         if reset:
             self.reset()
@@ -104,10 +94,6 @@ class PupilMask():
         str
             Response from the motor after moving to the target position.
         """
-        if SANDBOX_MODE:
-            move_type = "absolute" if abs else "relative"
-            print(f"⛱️ [SANDBOX] PupilMask - Move horizontal {move_type}: {pos} steps")
-        
         if abs:
             return self.zaber_h.move_abs(pos)
         else:
@@ -131,10 +117,6 @@ class PupilMask():
         str
             Response from the motor after moving to the target position.
         """
-        if SANDBOX_MODE:
-            move_type = "absolute" if abs else "relative"
-            print(f"⛱️ [SANDBOX] PupilMask - Move vertical {move_type}: {pos} steps")
-        
         if abs:
             return self.zaber_v.move_abs(pos)
         else:
@@ -159,10 +141,6 @@ class PupilMask():
         str
             Response from the motor after moving to the target position.
         """
-        if SANDBOX_MODE:
-            move_type = "absolute" if abs else "relative"
-            print(f"⛱️ [SANDBOX] PupilMask - Rotate {move_type}: {pos} degrees")
-        
         if abs:
             return self.newport.move_abs(pos)
         else:
@@ -195,9 +173,7 @@ class PupilMask():
         str
             Response from the motor after moving to the target position.
         """
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] PupilMask - Applying mask {key}")
-        
+
         if config_path:
             with open(config_path, 'r') as f:
                 data = json.load(f)
@@ -217,8 +193,6 @@ class PupilMask():
             self.newport.move_abs(wh) # Move to the desired mask position
 
         else:
-            if SANDBOX_MODE:
-                print(f"⛱️ [SANDBOX] PupilMask - No config file provided, only rotating wheel")
             mask = int(key)
             if 1 <= mask <= 6:
                 self.newport.move_abs(self.newport_home + (mask-1)*60) # Move to the desired mask position
@@ -282,8 +256,6 @@ class PupilMask():
         """
         Reset the mask wheel to the 4 vertical holes and the Zaber motors to their home positions.
         """
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] PupilMask - Resetting to home position")
         
         self.newport.home_search()
         self.apply_mask(4)
@@ -333,15 +305,10 @@ class Zaber():
         """
         Wait for the motor to reach the target position.
         """
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Zaber motor {self.id} - Waiting for movement...")
-            time.sleep(0.1)  # Reduced wait simulation
-            print(f"⛱️ [SANDBOX] Zaber motor {self.id} - Position reached")
-        else:
-            position = None
-            while position != self.get():
-                position = self.get()
-                time.sleep(0.1)
+        position = None
+        while position != self.get():
+            position = self.get()
+            time.sleep(0.1)
 
     #--------------------------------------------------------------------------
 
@@ -359,8 +326,6 @@ class Zaber():
         str
             Response from the motor.
         """
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Zaber motor {self.id} - Command: {command}")
         
         self._session.write(f"/{self.id} {command}\r\n".encode())
         return self._session.readline().decode()
@@ -451,8 +416,6 @@ class Newport():
         str
             Response from the motor after moving to home position.
         """
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] Newport - Home search initiated")
         
         response = self.send_command("1OR?")
         self.wait()
@@ -464,15 +427,10 @@ class Newport():
         """
         Wait for the motor to reach the target position.
         """
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] Newport - Waiting for movement...")
-            time.sleep(0.1)  # Reduced wait simulation
-            print("⛱️ [SANDBOX] Newport - Position reached")
-        else:
-            position = None
-            while position != self.get():
-                position = self.get()
-                time.sleep(0.1)
+        position = None
+        while position != self.get():
+            position = self.get()
+            time.sleep(0.1)
 
     #--------------------------------------------------------------------------
 
@@ -490,8 +448,6 @@ class Newport():
         str
             Response from the motor.
         """
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Newport - Command: {command}")
 
         self._session.write(f"{command}\r\n".encode())
         return self._session.readline().decode()

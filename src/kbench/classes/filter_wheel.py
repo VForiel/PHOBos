@@ -1,12 +1,5 @@
 import time
-from .. import SANDBOX_MODE
-
-# Conditional import based on mode
-if SANDBOX_MODE:
-    from ..sandbox.serial_mock import Serial as serial_Serial
-else:
-    import serial
-    serial_Serial = serial.Serial
+from .. import serial
 
 class FilterWheel():
     def __init__(self, filter_port:str = "/dev/ttyUSB2"):
@@ -30,12 +23,9 @@ class FilterWheel():
 
         """
       
-        self.session = serial_Serial(filter_port, 115200, timeout=0.1)
+        self.session = serial.Serial(filter_port, 115200, timeout=0.1)
         
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Filter Wheel initialized on port {filter_port}")
-        else:
-            print(f"Filter Wheel connected on port {filter_port}")
+        print(f"Filter Wheel connected on port {filter_port}")
         
     def _purge(self):
         """
@@ -48,8 +38,6 @@ class FilterWheel():
         """
         Close the serial connection.
         """
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] Filter Wheel connection closed")
         self.session.close()    
 
         
@@ -83,16 +71,7 @@ class FilterWheel():
         time.sleep(0.1)
         resp = self.get()
         
-        if SANDBOX_MODE:
-            # Simulated response format: "0 1 COMPLETED"
-            parts = resp.split()
-            if len(parts) >= 2:
-                slot = int(parts[1])  # Take the second part
-            else:
-                slot = 1  # Default value
-        else:
-            # Real response format
-            slot = int(resp[5])
+        slot = int(resp[5])
         
         return slot
 
@@ -105,10 +84,7 @@ class FilterWheel():
         slot : int
             Position number of the wheel to reach.
         """
-        if SANDBOX_MODE:
-            print(f'⛱️ [SANDBOX] FILT - Move to position {slot}')
-        else:
-            print('FILT - Move to position '+str(slot))
+        print('FILT - Move to position '+str(slot))
         self.session.write(("pos="+str(slot)+"\r").encode())
         self.wait()
 
@@ -117,15 +93,10 @@ class FilterWheel():
         """
         Wait for the motor to reach the target position.
         """
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] Filter Wheel - Waiting for position...")
-            time.sleep(0.1)  # Reduced wait simulation
-            print("⛱️ [SANDBOX] Filter Wheel - Position reached")
-        else:
-            position = ''
-            while len(position) == 0:
-                position = self.get()
-                time.sleep(0.1)
+        position = ''
+        while len(position) == 0:
+            position = self.get()
+            time.sleep(0.1)
 
     
     def wait(self) -> None:

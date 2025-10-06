@@ -2,7 +2,7 @@ import numpy as np
 import os
 import json
 import time
-from .. import bmc, SANDBOX_MODE
+from .. import bmc
 
 class DM():
     """
@@ -46,8 +46,6 @@ class DM():
         self.bmcdm.open_dm(self._serial_number)
         self._segments = [Segment(self, i) for i in range(169)]
 
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] DM {serial_number} initialized with {len(self._segments)} segments")
 
         # Set the initial configuration of the DM
         try:
@@ -57,11 +55,7 @@ class DM():
             for segment in self.segments:
                 segment.set_ptt(0, 0, 0)
 
-        # In sandbox mode, no need to wait for stabilization
-        if not SANDBOX_MODE:
-            time.sleep(stabilization_time)
-        else:
-            print(f"⛱️ [SANDBOX] Skipping {stabilization_time}s stabilization wait")
+        time.sleep(stabilization_time)
 
     # Properties ------------------------------------------------------------
 
@@ -133,10 +127,7 @@ class DM():
         Close the DM connection when the object is deleted.
         """
         self.bmcdm.close_dm()
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] DM {self._serial_number} object deleted")
-        else:
-            print(f"DM with serial number {self._serial_number} closed.")
+        print(f"DM with serial number {self._serial_number} closed.")
         DM._all.remove(self)
 
     #Config -------------------------------------------------------------------
@@ -166,10 +157,7 @@ class DM():
         with open(path, 'w') as f:
             json.dump(config, f, indent=4)
         
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Configuration would be saved to {path}")
-        else:
-            print(f"Configuration saved to {path}")
+        print(f"Configuration saved to {path}")
 
     def load_config(self, config_path:str = _default_config_path):
         """
@@ -184,22 +172,13 @@ class DM():
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Config file not found: {config_path}")
         
-        if SANDBOX_MODE:
-            print(f"⛱️ [SANDBOX] Loading config file: {config_path}")
-        else:
-            print(f"Loading config file: {config_path}.")
+        print(f"Loading config file: {config_path}.")
         
         with open(config_path, 'r') as f:
             config = json.load(f)
         
         for segment_id, segment_config in config["segments"].items():
             segment = self.segments[int(segment_id)]
-            segment.set_ptt(segment_config["piston"], segment_config["tip"], segment_config["tilt"])
-        
-        if SANDBOX_MODE:
-            print("⛱️ [SANDBOX] Configuration loaded")
-        else:
-            print("Configuration loaded")
             segment.set_ptt(segment_config["piston"], segment_config["tip"], segment_config["tilt"])
         
         print("Configuration loaded")
