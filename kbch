@@ -1,22 +1,22 @@
 #!/bin/bash
-# Obtenir le répertoire du script de manière plus robuste
+# Get script directory in a more robust way
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Utiliser l'environnement virtuel Python si disponible
+# Use Python virtual environment if available
 if [[ -f "$SCRIPT_DIR/.venv/bin/python" ]]; then
     PYTHON_CMD="$SCRIPT_DIR/.venv/bin/python"
 elif command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
 else
-    echo "Erreur: python3 n'est pas installé ou n'est pas dans le PATH"
+    echo "Error: python3 is not installed or not in PATH"
     exit 1
 fi
 
-# Vérifier que le script Python existe
+# Check that the Python script exists
 if [[ ! -f "$SCRIPT_DIR/scripts/cli_linux.py" ]]; then
-    echo "Erreur: $SCRIPT_DIR/scripts/cli_linux.py n'existe pas"
+    echo "Error: $SCRIPT_DIR/scripts/cli_linux.py does not exist"
     exit 1
 fi
 
-# Exécuter le script Python avec tous les arguments
+# Execute the Python script with all arguments
 "$PYTHON_CMD" "$SCRIPT_DIR/scripts/cli_linux.py" "$@"

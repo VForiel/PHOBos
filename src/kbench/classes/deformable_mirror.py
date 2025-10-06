@@ -394,5 +394,5 @@ class Segment():
             The tilt value of the segment in milliradians.
         """
         
-        # Conversion inline plus rapide que des appels de méthode
+        # Inline conversion faster than method calls
         return self.piston, self.tip * 1000.0, self.tilt * 1000.0

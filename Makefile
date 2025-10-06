@@ -1,19 +1,19 @@
-# Makefile pour kbench-controls
+# Makefile for kbench-controls
 
 .PHONY: help install install-dev clean test docs format lint
 
 help:
-	@echo "Commandes disponibles:"
-	@echo "  install     - Installer l'environnement de production"
-	@echo "  clean       - Nettoyer les fichiers temporaires"
-	@echo "  test        - Lancer les tests"
-	@echo "  docs        - Construire la documentation"
-	@echo "  format      - Formater le code avec black"
-	@echo "  lint        - Vérifier le code avec flake8"
+	@echo "Available commands:"
+	@echo "  install     - Install production environment"
+	@echo "  clean       - Clean temporary files"
+	@echo "  test        - Run tests"
+	@echo "  docs        - Build documentation"
+	@echo "  format      - Format code with black"
+	@echo "  lint        - Check code with flake8"
 
 install:
 	conda env create -f environment.yml
-	@echo "Environnement installé. Pour l'activer, utilisez : conda activate Kbench"
+	@echo "Environment installed. To activate it, use: conda activate Kbench"
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

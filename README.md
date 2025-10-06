@@ -6,52 +6,52 @@ This repo aim to provide a full set of tools to control all the devices on the K
 
 Requirements:
 - [Python 3.12](https://www.python.org/)
-- [Conda](https://docs.conda.io/en/latest/miniconda.html) (recommandé)
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) (recommended)
 
-### Option 1: Installation avec Conda (recommandée)
+### Option 1: Installation with Conda (recommended)
 
-1. Créer et activer l'environnement conda
+1. Create and activate the conda environment
     ```bash
     conda env create -f environment.yml
     conda activate kbench-controls
     ```
 
-2. Démarrer une instance Python
+2. Start a Python instance
     ```bash
     python
     ```
-    Et importer le module kbench
+    And import the kbench module
     ```python
     import kbench
     ```
 
-### Option 2: Installation avec pip
+### Option 2: Installation with pip
 
-1. (Recommandé) Créer un environnement virtuel
+1. (Recommended) Create a virtual environment
     ```bash
     python3.12 -m venv .venv
     ```
-    et l'activer
+    and activate it
     ```bash
     source .venv/bin/activate # Linux
     .venv/Scripts/activate # Windows
     ```
 
-2. Installer le module Python
+2. Install the Python module
     ```bash
     pip install -r requirements.txt
     pip install -e .
     ```
 
-3. Démarrer une instance Python
+3. Start a Python instance
     ```bash
     python
     ```
-    Et importer le module kbench
+    And import the kbench module
     ```python
     import kbench
     ```
-    Vous pouvez maintenant utiliser tous les appareils du Kbench selon la documentation !
+    You can now use all Kbench devices according to the documentation!
 
 ## 📚 Documentation
 

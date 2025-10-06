@@ -27,11 +27,11 @@ extensions = [
     'sphinx.ext.viewcode',
 ]
 
-# Utilise le format NumPy par défaut (True)
+# Use NumPy format by default (True)
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
-# Options supplémentaires (souvent utiles)
+# Additional options (often useful)
 napoleon_include_init_with_doc = True
 napoleon_include_private_with_doc = False
 napoleon_use_param = True

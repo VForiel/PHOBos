@@ -69,7 +69,7 @@ def main():
 #==============================================================================
 
 def show_help():
-    print("📋 KBENCH - Ker... euh, Photonics Bench Control Interface")
+    print("📋 KBENCH - Ker... uh, Photonics Bench Control Interface")
     print("="*50)
     print("Usage: kbch [equipment] [command] [options]")
     print("       kbch config [command] [options]")
