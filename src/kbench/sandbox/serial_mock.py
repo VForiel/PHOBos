@@ -20,6 +20,8 @@ class Serial:
         self.timeout = timeout
         self.is_open = True
         self._buffer = []
+        self._xpow_currents = {}
+        self._xpow_voltages = {}
         
         print(f"⛱️ [SANDBOX] Opening serial connection: port={port}, baudrate={baudrate}, timeout={timeout}s")
     
@@ -101,6 +103,31 @@ class Serial:
         elif command.startswith("1PR"):
             pos = command[3:]
             return f"1PR{pos}"
+        
+        # Response for XPOW
+        elif command == "*IDN?":
+            return f"XPOW"
+        elif command.startswith("CH:"):
+            items = command.split(":")
+            channel = items[1]
+            if "CUR" in command:
+                current = round(float(items[-1]) / (65535 / 210 / 1.418),3)
+                self._xpow_currents[channel] = current
+                return f"Channel {channel} set to {current} mA"
+            elif "VOLT" in command:
+                voltage = round(float(items[-1]) / (65535 / 26 / 1.533),3)
+                self._xpow_voltages[channel] = voltage
+                return f"Channel {channel} set to {voltage} V"
+            if command.endswith(":VAL?"):
+                if channel not in self._xpow_currents:
+                    self._xpow_currents[channel] = 0
+                if channel not in self._xpow_voltages:
+                    self._xpow_voltages[channel] = 0
+                return f"CH:{channel}:VAL? >> Channel {channel} = {self._xpow_voltages[channel]:.3f}V, {self._xpow_currents[channel]:.3f}mA"
+
+                return f"CH:{command[3:-5]}:VAL? 0 OK IDLE -- 150000"  # Simulated value
+            else:
+                return "Invalid command"
         
         # Generic response
         return "OK"

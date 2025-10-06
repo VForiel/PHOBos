@@ -1,7 +1,43 @@
 import numpy as np
-import serial
+from .. import serial
 import time
 import matplotlib.pyplot as plt
+from .. import SANDBOX_MODE
+import re
+
+class Channel:
+    """
+    Represents a single channel on the photonic chip.
+    Provides an intuitive interface for controlling individual channels.
+    """
+    
+    def __init__(self, chip_instance, channel_number: int):
+        self.chip = chip_instance
+        self.channel = channel_number
+        
+    def set_current(self, current: float):
+        """Set current for this channel in mA."""
+        Chip.set_current(self.channel, current)
+        
+    def set_voltage(self, voltage: float):
+        """Set voltage for this channel in V.""" 
+        Chip.set_voltage(self.channel, voltage)
+        
+    def get_current(self) -> float:
+        """Get current for this channel in mA."""
+        return Chip.get_current(self.channel)
+        
+    def get_voltage(self) -> float:
+        """Get voltage for this channel in V."""
+        return Chip.get_voltage(self.channel)
+        
+    def ensure_current(self, current: float, tolerance: float = 0.1, max_attempts: int = 100):
+        """Ensure current reaches target within tolerance."""
+        return Chip.ensure_current(self.channel, current, tolerance, max_attempts)
+        
+    def ensure_voltage(self, voltage: float, tolerance: float = 0.01, max_attempts: int = 100):
+        """Ensure voltage reaches target within tolerance."""
+        return Chip.ensure_voltage(self.channel, voltage, tolerance, max_attempts)
 
 class Chip:
     """
@@ -159,6 +195,9 @@ class Chip:
     CUR_COEFFS = np.ones(N_CHANNELS) * 65535 / 210 / 1.418
     VOLT_COEFFS = np.ones(N_CHANNELS) * 65535 / 26 / 1.533
 
+    MAX_VOLTAGE = 10 # V
+    MAX_CURRENT = 300 # mA
+
     SERIAL = None
 
     def __init__(self, arch:int):
@@ -166,41 +205,69 @@ class Chip:
         if arch not in Chip.ARCHS:
             raise ValueError(f"❌ Unvalid architecture {arch}. Available architectures are: {list(Chip.ARCHS.keys())}")
 
-        if Chip.SERIAL is None:
-            # Setup serial connection
-            ...
-            # Check connexion
-            res = self.send_command("*IDN?")
-            if "XPOW" not in res:
-                raise ConnectionError(f"❌ No response from the XPOW controller on port {self.port} at {self.baudrate} bauds. Response was: {res}")
-
         self.name = self.ARCHS[arch]['name']
         self.id = self.ARCHS[arch]['id']
         self.number = arch
         self.n_inputs = self.ARCHS[arch]['n_inputs']
         self.n_outputs = self.ARCHS[arch]['n_outputs']
         self.topas = self.ARCHS[arch]['topas']
+        
+        # Create channel objects for easy access
+        self._channels = {}
+        for topa_idx, channel_num in enumerate(self.topas):
+            self._channels[topa_idx + 1] = Channel(self, channel_num)
 
-    @staticmethod
-    def send_command(cmd:str) -> str:
+    @classmethod
+    def connect(cls):
+        if Chip.SERIAL is None:
+            # Setup serial connection
+            if SANDBOX_MODE:
+                port = '/dev/ttyACM0'
+            else:
+                from serial.tools import list_ports
+                port = list(list_ports.grep("2341:8036"))[0][0]   
+            Chip.SERIAL = serial.Serial(port, baudrate=115200, timeout=1.0)     
+            # Check connexion
+            res = cls.send_command("*IDN?")
+            if "XPOW" not in res:
+                raise ConnectionError(f"❌ No response from the XPOW controller on port {self.port} at {self.baudrate} bauds. Response was: {res}")
+        return cls.SERIAL
+    
+    @classmethod
+    def disconnect(cls):
+        if cls.SERIAL is not None:
+            cls.SERIAL.close()
+            cls.SERIAL = None
+    
+    def __getitem__(self, topa_index: int) -> Channel:
+        """
+        Access channel by TOPA index: c[1] returns first TOPA channel.
+        """
+        if topa_index not in self._channels:
+            raise IndexError(f"❌ TOPA index {topa_index} not available for architecture {self.number}. Available indices: {list(self._channels.keys())}")
+        return self._channels[topa_index]
+
+    @classmethod
+    def send_command(cls, cmd:str) -> str:
         # Send a command to the XPOW and return the answer
         cmd += "\n"
-        Chip.SERIAL.write(cmd.encode())
+        cls.connect()
+        cls.SERIAL.write(cmd.encode())
         time.sleep(0.01)  # Wait a bit for the command to be processed
-        response = Chip.SERIAL.readline().decode().strip()
+        response = cls.SERIAL.readline().decode().strip()
         return response
 
-    @staticmethod
-    def update_coeffs(plot:bool=False):
+    @classmethod
+    def update_coeffs(cls, plot:bool=False):
         """
         Scan current and voltage for all TOPAs, query the XPOW for measured values,
         and refine CUR_COEFFS and VOLT_COEFFS by linear fitting.
         If plot=True, display fit results for visual inspection.
         """
 
-        n = Chip.N_CHANNELS
-        test_currents = np.linspace(10, 300, 6)  # mA, avoid 0 for linearity
-        test_voltages = np.linspace(1, 10, 6)    # V, avoid 0 for linearity
+        n = cls.N_CHANNELS
+        test_currents = np.linspace(1, cls.MAX_CURRENT, 10)  # mA, avoid 0 for linearity
+        test_voltages = np.linspace(0.1, cls.MAX_VOLTAGE, 10)    # V, avoid 0 for linearity
 
         new_cur_coeffs = np.zeros(n)
         new_volt_coeffs = np.zeros(n)
@@ -209,33 +276,23 @@ class Chip:
             # Current calibration
             measured = []
             for c in test_currents:
-                Chip.send_command(f"CH:{ch}:CUR:{int(c * Chip.CUR_COEFFS[ch-1])}")
-                time.sleep(0.05)
-                res = Chip.send_command(f"CH:{ch}:VAL?")
-                try:
-                    val = float(res.split(",")[0])  # Assume first value is current in mA
-                except Exception:
-                    val = np.nan
+                cls.set_current(ch, c)
+                val = cls.get_current(ch)
                 measured.append(val)
             measured = np.array(measured)
             # Linear fit: measured = a * set + b
             coeffs = np.polyfit(test_currents, measured, 1)
-            new_cur_coeffs[ch-1] = Chip.CUR_COEFFS[ch-1] / coeffs[0] if coeffs[0] != 0 else Chip.CUR_COEFFS[ch-1]
+            new_cur_coeffs[ch-1] = cls.CUR_COEFFS[ch-1] / coeffs[0] if coeffs[0] != 0 else cls.CUR_COEFFS[ch-1]
 
             # Voltage calibration
             measured_v = []
             for v in test_voltages:
-                Chip.send_command(f"CH:{ch}:VOLT:{int(v * Chip.VOLT_COEFFS[ch-1])}")
-                time.sleep(0.05)
-                res = Chip.send_command(f"CH:{ch}:VAL?")
-                try:
-                    val = float(res.split(",")[1])  # Assume second value is voltage in V
-                except Exception:
-                    val = np.nan
+                cls.set_voltage(ch, v)
+                val = cls.get_voltage(ch)
                 measured_v.append(val)
             measured_v = np.array(measured_v)
             coeffs_v = np.polyfit(test_voltages, measured_v, 1)
-            new_volt_coeffs[ch-1] = Chip.VOLT_COEFFS[ch-1] / coeffs_v[0] if coeffs_v[0] != 0 else Chip.VOLT_COEFFS[ch-1]
+            new_volt_coeffs[ch-1] = cls.VOLT_COEFFS[ch-1] / coeffs_v[0] if coeffs_v[0] != 0 else cls.VOLT_COEFFS[ch-1]
 
             if plot:
                 plt.figure(figsize=(10,4))
@@ -256,71 +313,85 @@ class Chip:
                 plt.tight_layout()
                 plt.show()
 
-        Chip.CUR_COEFFS = new_cur_coeffs
-        Chip.VOLT_COEFFS = new_volt_coeffs
+        cls.CUR_COEFFS = new_cur_coeffs
+        cls.VOLT_COEFFS = new_volt_coeffs
         print("✅ Coefficients updated.")
 
-    def set_current(self, topa:int, current:float, abs_channel:bool=False):
-        # From 0 to 300 mA
-        current = np.max(0, np.min(300, current))  # Clamp to valid range
-        channel = self.topas[topa] if not abs_channel else topa
-        current = current * Chip.CUR_COEFFS[channel-1]
-        Chip.send_command(f"CH:{channel}:CUR:{int(current)}")
+    @classmethod
+    def set_current(cls, channel: int, current: float):
+        """Set current for a specific channel (absolute channel number)."""
+        current = max(0, min(cls.MAX_CURRENT, current))  # Clamp to valid range
+        current_value = current * cls.CUR_COEFFS[channel-1]
+        cls.send_command(f"CH:{channel}:CUR:{int(current_value)}")
 
-    def set_voltage(self, topa:int, voltage:float, abs_channel:bool=False):
-        # From 0 to 10 V
-        voltage = np.max(0, np.min(10, voltage))  # Clamp to valid range
-        channel = self.topas[topa] if not abs_channel else topa
-        voltage = voltage * Chip.VOLT_COEFFS[channel-1]
-        Chip.send_command(f"CH:{channel}:VOLT:{int(voltage)}")
+    @classmethod
+    def set_voltage(cls, channel: int, voltage: float):
+        """Set voltage for a specific channel (absolute channel number)."""
+        voltage = max(0, min(cls.MAX_VOLTAGE, voltage))  # Clamp to valid range
+        voltage_value = voltage * cls.VOLT_COEFFS[channel-1]
+        cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}")
 
-    def get_current(self, topa:int, abs_channel:bool=False) -> float:
-        channel = self.topas[topa] if not abs_channel else topa
-        res = Chip.send_command(f"CH:{channel}:VAL?")
+    @classmethod
+    def get_current(cls, channel: int) -> float:
+        """Get current for a specific channel (absolute channel number)."""
+        res = cls.send_command(f"CH:{channel}:VAL?")
         # Regex to extract the value from the response
-        ...
+        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
+        if match:
+            return float(match.group(2))
+        else:
+            raise ValueError(f"❌ Unable to parse current from response: {res}")
 
-    def get_voltage(self, topa:int, abs_channel:bool=False) -> float:
-        channel = self.topas[topa] if not abs_channel else topa
-        res = Chip.send_command(f"CH:{channel}:VAL?")
+    @classmethod
+    def get_voltage(cls, channel: int) -> float:
+        """Get voltage for a specific channel (absolute channel number)."""
+        res = cls.send_command(f"CH:{channel}:VAL?")
         # Regex to extract the value from the response
-        ...
+        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
+        if match:
+            return float(match.group(1))
+        else:
+            raise ValueError(f"❌ Unable to parse voltage from response: {res}")
 
-    def ensure_current(self, topa:int, current:float, tolerance:float=0.1, abs_channel:bool=False, max_attempts:int=100):
-        # Ensure that the current setpoint is reached within the specified tolerance
+    @classmethod
+    def ensure_current(cls, channel: int, current: float, tolerance: float = 0.1, max_attempts: int = 100):
+        """Ensure that the current setpoint is reached within the specified tolerance."""
         attempts = 0
+        step_current = current
         while attempts < max_attempts:
-            measured_current = self.get_current(topa, abs_channel=abs_channel)
+            measured_current = cls.get_current(channel)
             error = current - measured_current
             if abs(error) <= tolerance:
-                return
+                return step_current / current
             # Simple proportional step, tune factor as needed
             step = 0.5 * error
-            current += step
-            self.set_current(topa, current, abs_channel=abs_channel)
+            step_current = measured_current + step
+            cls.set_current(channel, step_current)
             attempts += 1
         if abs(error) > tolerance:
-            raise RuntimeError(f"❌ Unable to reach target current {current} mA on TOPA {topa} within {tolerance} mA after {max_attempts} attempts.")
+            raise RuntimeError(f"❌ Unable to reach target current {current} mA on channel {channel} within {tolerance} mA after {max_attempts} attempts.")
         
-    def ensure_voltage(self, topa:int, voltage:float, tolerance:float=0.01, abs_channel:bool=False, max_attempts:int=100):
-        # Ensure that the voltage setpoint is reached within the specified tolerance
+    @classmethod
+    def ensure_voltage(cls, channel: int, voltage: float, tolerance: float = 0.01, max_attempts: int = 100):
+        """Ensure that the voltage setpoint is reached within the specified tolerance."""
         attempts = 0
+        step_voltage = voltage
         while attempts < max_attempts:
-            measured_voltage = self.get_voltage(topa, abs_channel=abs_channel)
+            measured_voltage = cls.get_voltage(channel)
             error = voltage - measured_voltage
             if abs(error) <= tolerance:
-                return
+                return step_voltage / voltage
             # Simple proportional step, tune factor as needed
             step = 0.5 * error
-            voltage += step
-            self.set_voltage(topa, voltage, abs_channel=abs_channel)
+            step_voltage = measured_voltage + step
+            cls.set_voltage(channel, step_voltage)
             attempts += 1
         if abs(error) > tolerance:
-            raise RuntimeError(f"❌ Unable to reach target voltage {voltage} V on TOPA {topa} within {tolerance} V after {max_attempts} attempts.")
+            raise RuntimeError(f"❌ Unable to reach target voltage {voltage} V on channel {channel} within {tolerance} V after {max_attempts} attempts.")
 
-    @staticmethod
-    def turn_off():
-        # Turn off all the topas
-        for topa in range(1, Chip.N_CHANNELS+1):
-            Chip.send_command(f"CH:{topa}:CUR:0")
-            Chip.send_command(f"CH:{topa}:VOLT:0")
+    @classmethod
+    def turn_off(cls):
+        """Turn off all channels."""
+        for channel in range(1, cls.N_CHANNELS+1):
+            cls.send_command(f"CH:{channel}:CUR:0")
+            cls.send_command(f"CH:{channel}:VOLT:0")
