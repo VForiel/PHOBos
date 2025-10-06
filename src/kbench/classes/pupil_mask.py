@@ -326,7 +326,7 @@ class Zaber():
         str
             Response from the motor.
         """
-        
+        _ = self._session.readlines() # Clear the buffer
         self._session.write(f"/{self.id} {command}\r\n".encode())
         return self._session.readline().decode()
     
@@ -448,7 +448,7 @@ class Newport():
         str
             Response from the motor.
         """
-
+        _ = self._session.readlines() # Clear the buffer
         self._session.write(f"{command}\r\n".encode())
         return self._session.readline().decode()
     

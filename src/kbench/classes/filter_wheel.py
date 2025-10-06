@@ -97,13 +97,3 @@ class FilterWheel():
         while len(position) == 0:
             position = self.get()
             time.sleep(0.1)
-
-    
-    def wait(self) -> None:
-        """
-        Wait for the motor to reach the target position.
-        """
-        position = ''
-        while len(position) == 0:
-            position = self.get()
-            time.sleep(0.1)

@@ -256,6 +256,7 @@ class Chip:
         cls.connect()
         if verbose:
             print(f"📤 XPOW TX: '{cmd}'")
+        _ = cls.SERIAL.readlines() # Clear the buffer
         cls.SERIAL.write(cmd_line.encode())
         time.sleep(0.01)  # Wait a bit for the command to be processed
         response = cls.SERIAL.readline().decode().strip()
