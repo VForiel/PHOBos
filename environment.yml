@@ -1,0 +1,29 @@
+name: Kbench
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pyserial
+  - pyyaml
+  - toml>=0.10.2
+  - pip
+  - setuptools>=64
+  - wheel
+  # Development dependencies
+  - pytest
+  - pytest-cov
+  - black
+  - flake8
+  - mypy
+  - jupyter
+  - ipython
+  # Documentation dependencies
+  - sphinx
+  - myst-parser
+  - furo
+  - pip:
+    - linkify-it-py
+    - sphinx-copybutton
+    - -e .

@@ -1,8 +1,8 @@
 # virtual environment
 .venv
-/.pdm-python
-/pdm.lock
-/.pdm-build/
+# Conda environments
+.conda/
+conda-bld/
 
 # Python
 __pycache__/

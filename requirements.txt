@@ -1,0 +1,4 @@
+numpy
+pyserial
+pyyaml
+toml>=0.10.2

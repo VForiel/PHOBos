@@ -1,11 +1,10 @@
 [project]
 name = "kbench-controls"
 version = "0.7.1"
-description = "Default template for PDM package"
+description = "Python package for controlling optical test bench equipment in kernel-nulling interferometry"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
     {name = "mmartinod", email = "ma.martinod@free.fr"},
-    {name = "", email = ""},
 ]
 dependencies = [
     "numpy",
@@ -13,19 +12,24 @@ dependencies = [
     "pyyaml",
     "toml>=0.10.2",
 ]
-requires-python = "==3.12.*"
+requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.scripts]
+kbch = "kbench.cli:main"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-[tool.pdm]
-distribution = true
-
-[tool.pdm.dev-dependencies]
-dev = []
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = true
