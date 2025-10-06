@@ -342,7 +342,7 @@ class Chip:
         """Get current for a specific channel (absolute channel number)."""
         res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
-        match = re.search(r'=\s*([\d\.]+)V,([\d\.]+)mA', res)
+        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
         if match:
             return float(match.group(2))
         else:
@@ -353,7 +353,7 @@ class Chip:
         """Get voltage for a specific channel (absolute channel number)."""
         res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
-        match = re.search(r'=\s*([\d\.]+)V,([\d\.]+)mA', res)
+        match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
         if match:
             return float(match.group(1))
         else:

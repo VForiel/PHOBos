@@ -123,7 +123,7 @@ class Serial:
                     self._xpow_currents[channel] = 0
                 if channel not in self._xpow_voltages:
                     self._xpow_voltages[channel] = 0
-                return f"CH:{channel}:VAL?  >>  Channel {channel} = {self._xpow_voltages[channel]:.3f}V,{self._xpow_currents[channel]:.3f}mA"
+                return f"CH:{channel}:VAL?  >>  Channel {channel} = {self._xpow_voltages[channel]:.3f}V, {self._xpow_currents[channel]:.3f}mA"
 
                 return f"CH:{command[3:-5]}:VAL? 0 OK IDLE -- 150000"  # Simulated value
             else:
