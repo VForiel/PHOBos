@@ -195,7 +195,7 @@ class Chip:
     CUR_COEFFS = np.ones(N_CHANNELS) * 65535 / 210 / 1.418
     VOLT_COEFFS = np.ones(N_CHANNELS) * 65535 / 26 / 1.533
 
-    MAX_VOLTAGE = 10 # V
+    MAX_VOLTAGE = 5 # V
     MAX_CURRENT = 300 # mA
 
     SERIAL = None
@@ -250,19 +250,25 @@ class Chip:
         return self._channels[topa_index]
 
     @classmethod
-    def send_command(cls, cmd: str, verbose: bool = False) -> str:
+    def send_command(cls, cmd: str, verbose: bool = False, output=True) -> str:
         # Send a command to the XPOW and return the answer
         cmd_line = cmd + "\n"
         cls.connect()
+        cls.SERIAL.flushInput()
+        cls.SERIAL.flushOutput()
         if verbose:
             print(f"📤 XPOW TX: '{cmd}'")
-        _ = cls.SERIAL.readlines() # Clear the buffer
         cls.SERIAL.write(cmd_line.encode())
         time.sleep(0.01)  # Wait a bit for the command to be processed
-        response = cls.SERIAL.readline().decode().strip()
-        if verbose:
-            print(f"📥 XPOW RX: '{response}'")
-        return response
+        if output:
+            response = cls.SERIAL.readline().decode().strip()
+            if verbose:
+                print(f"📥 XPOW RX: '{response}'")
+            return response
+        else:
+            print(f"📥 Output disabled")
+            return None
+
 
     @classmethod
     def update_coeffs(cls, plot: bool = False, verbose: bool = False):
@@ -280,6 +286,7 @@ class Chip:
         new_volt_coeffs = np.zeros(n)
 
         for ch in range(1, n+1):
+            cls.turn_off()
             # Current calibration
             measured = []
             for c in test_currents:
@@ -325,18 +332,18 @@ class Chip:
         print("✅ Coefficients updated.")
 
     @classmethod
-    def set_current(cls, channel: int, current: float, verbose: bool = False):
+    def set_current(cls, channel: int, current: float, verbose: bool = False, output=False):
         """Set current for a specific channel (absolute channel number)."""
         current = max(0, min(cls.MAX_CURRENT, current))  # Clamp to valid range
         current_value = current * cls.CUR_COEFFS[channel-1]
-        cls.send_command(f"CH:{channel}:CUR:{int(current_value)}", verbose=verbose)
+        cls.send_command(f"CH:{channel}:CUR:{int(current_value)}", verbose=verbose, output=output)
 
     @classmethod
-    def set_voltage(cls, channel: int, voltage: float, verbose: bool = False):
+    def set_voltage(cls, channel: int, voltage: float, verbose: bool = False, output=False):
         """Set voltage for a specific channel (absolute channel number)."""
         voltage = max(0, min(cls.MAX_VOLTAGE, voltage))  # Clamp to valid range
         voltage_value = voltage * cls.VOLT_COEFFS[channel-1]
-        cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}", verbose=verbose)
+        cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}", verbose=verbose, output=output)
 
     @classmethod
     def get_current(cls, channel: int, verbose: bool = False) -> float:
