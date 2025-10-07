@@ -399,6 +399,5 @@ class Chip:
     @classmethod
     def turn_off(cls, verbose: bool = False):
         """Turn off all channels."""
-        for channel in range(1, cls.N_CHANNELS+1):
-            cls.send_command(f"CH:{channel}:CUR:0", verbose=verbose)
-            cls.send_command(f"CH:{channel}:VOLT:0", verbose=verbose)
+        cls.send_command(f"CH:1-{cls.N_CHANNELS}:CUR:0", verbose=verbose)
+        cls.send_command(f"CH:1-{cls.N_CHANNELS}:VOLT:0", verbose=verbose)
