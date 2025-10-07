@@ -32,6 +32,14 @@ except Exception as e:
     print("❌ Error: Could not retrieve version information.")
     print(f"ℹ️ {e}")
 
+# Try to get current commit (if in a git repo)
+try:
+    import subprocess
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    __version__ += f"+{commit[:7]}"
+except Exception:
+    pass
+
 
 # Make bmc, serial and classes available for other modules
 __all__ = ['bmc', 'serial', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'SANDBOX_MODE', '__version__']
