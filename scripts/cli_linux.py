@@ -690,14 +690,11 @@ def control_mask(args):
     if args[0] in ['get']:
         print("⌛ Getting current mask position...")
         
-        p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
-            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
-        )
+        p = kbench.PupilMask()
         
         # Get current positions
         # get_pos() returns (wheel_angle, zaber_vertical, zaber_horizontal)
-        wheel_pos, zab_v_pos, zab_h_pos = p.get_pos()
+        wheel_pos, zab_h_pos, zab_v_pos = p.get_pos()
         
         print(f"📐 Current mask position:")
         print(f"  🔄 Wheel angle: {wheel_pos}°")
