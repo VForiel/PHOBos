@@ -1,7 +1,4 @@
 mask:
-  ports:
-    newport: "/dev/ttyUSB0"
-    zaber: "/dev/ttyUSB1"
   slots:
     foo:
       a: 42.0
@@ -13,7 +10,6 @@ mask:
       y: 0
 
 filter:
-  port: "/dev/ttyUSB2"
   slots:
     qux:
       slot: 1

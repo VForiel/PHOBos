@@ -33,7 +33,7 @@ class PupilMask():
             self,
             # On which ports the components are connected
             zaber_port:str = "/dev/ttyUSB0",
-            newport_port:str = "/dev/ttyUSB3", # Newport device
+            newport_port:str = "/dev/ttyUSB2", # Newport device
             zaber_h_home:int = 188490, # Horizontal axis home position (steps)
             zaber_v_home:int = 154402, # Vertical axis home position (steps)
             newport_home:float = 56.15, # Angle of the pupil mask n°1 (degree)
@@ -72,6 +72,8 @@ class PupilMask():
         self.zaber_v = Zaber(zaber_session, 1)
         self.zaber_h = Zaber(zaber_session, 2)
         self.newport = Newport(newport_session)
+
+        print("pop")
 
         if reset:
             self.reset()
@@ -176,7 +178,7 @@ class PupilMask():
 
         if config_path:
             with open(config_path, 'r') as f:
-                data = json.load(f)
+                data = yaml.safe_load(f)
         
             mask_data = data['mask']['slots'][str(key)]
 
@@ -215,24 +217,24 @@ class PupilMask():
             Current position of the vertical Zaber motor (in steps).
         """
         wheel = float(self.newport.get())
-        zab2 = self.zaber_h.get()
-        zab1 = self.zaber_v.get()
+        zab_h = self.zaber_h.get()
+        zab_v = self.zaber_v.get()
         
-        zab1 = int(zab1.split(' ')[-1][:-2])
-        zab2 = int(zab2.split(' ')[-1][:-2])
+        zab_h = int(zab_h.split(' ')[-1][:-2])
+        zab_v = int(zab_v.split(' ')[-1][:-2])
         
-        return wheel, zab1, zab2
+        return wheel, zab_h, zab_v
     
     def save_pos(self, key:str, config_path:str):
         """
-        Save position of the wheel and the two zabers into a json file.
+        Save position of the wheel and the two zabers into a yml file.
 
         Parameters
         ----------
         key : str
             Key at which saving the configuration.
         config_path : str
-            Name of the json file.
+            Name of the yml file.
 
         """
                 
@@ -241,7 +243,13 @@ class PupilMask():
         
         wh, zab_h, zab_v = self.get_pos()
 
-        config[key] = {
+        if 'mask' not in config:
+            config['mask'] = {}
+
+        if 'slots' not in config['mask']:
+            config['mask']['slots'] = {}
+
+        config['mask']['slots'][key] = {
             'a': wh,
             'x': zab_h,
             'y': zab_v 
