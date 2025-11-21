@@ -32,8 +32,8 @@ class PupilMask():
     def __init__(
             self,
             # On which ports the components are connected
-            zaber_port:str = "/dev/ttyUSB0",
-            newport_port:str = "/dev/ttyUSB2", # Newport device
+            zaber_port:str = "/dev/ttyUSBzaber",
+            newport_port:str = "/dev/ttyUSBnewport", # Newport device
             zaber_h_home:int = 188490, # Horizontal axis home position (steps)
             zaber_v_home:int = 154402, # Vertical axis home position (steps)
             newport_home:float = 56.15, # Angle of the pupil mask n°1 (degree)
@@ -390,6 +390,11 @@ class Zaber():
         response = self.send_command(f"move rel {pos}")
         self.wait()
         return response
+    
+    def home_search(self) -> str:
+        response = self.send_command(f"home")
+        self.wait()
+        return response        
     
 #==============================================================================
 # Newport Class

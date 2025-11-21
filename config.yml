@@ -1,8 +1,8 @@
 filter:
-  port: /dev/ttyUSB1
+  port: /dev/ttyUSBthorlabs
   slots: {}
 mask:
   ports:
-    newport: /dev/ttyUSB3
-    zaber: /dev/ttyUSB0
+    newport: /dev/ttyUSBnewport
+    zaber: /dev/ttyUSBzaber
   slots: {}
