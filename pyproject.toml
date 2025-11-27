@@ -12,6 +12,7 @@ dependencies = [
     "pyyaml",
     "toml>=0.10.2",
     "astropy",
+    "scipy",
 ]
 requires-python = ">=3.12"
 readme = "README.md"

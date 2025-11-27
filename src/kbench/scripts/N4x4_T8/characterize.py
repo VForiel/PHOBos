@@ -18,7 +18,7 @@ The characterization consists of:
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict
 import time
 from datetime import datetime
 import json
@@ -94,6 +94,186 @@ def acquire(input_amplitudes: np.ndarray,
     intensities = np.abs(output_fields) ** 2
     
     return intensities
+
+
+def characterize_phase_shifters(chip: Optional[Chip],
+                                  wavelength: float = 1550.0,
+                                  current: float = 0.3,
+                                  v_max: float = 5.0,
+                                  n_steps: int = 50,
+                                  output_dir: str = "generated/",
+                                  verbose: bool = False) -> Dict[str, Dict]:
+    """
+    Characterize the voltage-to-phase relationship of phase shifters.
+    
+    This function scans voltage from 0 to v_max at constant current and measures
+    the induced phase shift. Results are saved and can be used for calibration.
+    
+    Parameters
+    ----------
+    chip : Chip, optional
+        Photonic chip instance. If None, simulates with 2π phase at 0.6W.
+    wavelength : float, optional
+        Wavelength in nm for phase measurement. Default is 1550 nm.
+    current : float, optional
+        Fixed current in A. Default is 0.3 A.
+    v_max : float, optional
+        Maximum voltage to scan in V. Default is 5.0 V.
+    n_steps : int, optional
+        Number of voltage steps. Default is 50.
+    output_dir : str, optional
+        Directory to save calibration file. Default is "generated/".
+    verbose : bool, optional
+        If True, print detailed information. Default is False.
+    
+    Returns
+    -------
+    dict
+        Dictionary with calibration data for each shifter channel.
+        Format: {channel_id: {"voltages": [...], "phases": [...], "powers": [...]}}
+    
+    Notes
+    -----
+    Simulation model: Phase = 2π * Power / 0.6W, where Power = Voltage * Current
+    At constant current (0.3A), Phase = 2π * V * 0.3 / 0.6 = π * V
+    """
+    # Shifter channels for N4x4-T8 (architecture 6): 17, 18, 19, 20
+    shifter_channels = [17, 18, 19, 20]
+    
+    # Voltage scan
+    voltages = np.linspace(0, v_max, n_steps)
+    
+    calibration_data = {}
+    
+    print(f"\n{'='*70}")
+    print("PHASE SHIFTER CHARACTERIZATION")
+    print(f"{'='*70}")
+    print(f"Wavelength: {wavelength} nm")
+    print(f"Current: {current} A (fixed)")
+    print(f"Voltage range: 0 to {v_max} V")
+    print(f"Steps: {n_steps}")
+    print(f"{'='*70}\n")
+    
+    for ch_idx, channel in enumerate(shifter_channels):
+        print(f"Characterizing shifter {ch_idx + 1}/4 (channel {channel})...")
+        
+        phases = np.zeros(n_steps)
+        powers = np.zeros(n_steps)
+        
+        for i, voltage in enumerate(voltages):
+            power = voltage * current  # Power in Watts
+            
+            if chip is not None and not SANDBOX_MODE:
+                # Real hardware - apply voltage and measure phase
+                # This would require interferometric measurement
+                chip[channel].set_voltage(voltage)
+                chip[channel].set_current(current)
+                time.sleep(0.05)
+                # TODO: Actual phase measurement from interference pattern
+                phases[i] = 0  # Placeholder
+            else:
+                # Simulation: 2π phase shift at 0.6W
+                phases[i] = 2 * np.pi * power / 0.6
+            
+            powers[i] = power
+        
+        calibration_data[f"channel_{channel}"] = {
+            "channel_id": channel,
+            "input_index": ch_idx,
+            "voltages": voltages.tolist(),
+            "phases": phases.tolist(),
+            "powers": powers.tolist(),
+            "wavelength": wavelength,
+            "current": current,
+        }
+        
+        if verbose:
+            print(f"  Voltage range: {voltages[0]:.3f} - {voltages[-1]:.3f} V")
+            print(f"  Phase range: {phases[0]:.3f} - {phases[-1]:.3f} rad ({phases[-1]/np.pi:.2f}π)")
+            print(f"  Power range: {powers[0]:.3f} - {powers[-1]:.3f} W")
+    
+    # Save calibration file
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    calib_file = output_path / "shifter_calibration.json"
+    
+    with open(calib_file, 'w') as f:
+        json.dump(calibration_data, f, indent=2)
+    
+    print(f"\nCalibration data saved to {calib_file}")
+    
+    # Plot calibration curves
+    if not verbose:
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        axes = axes.flatten()
+        
+        for ch_idx, channel in enumerate(shifter_channels):
+            ax = axes[ch_idx]
+            calib = calibration_data[f"channel_{channel}"]
+            voltages = np.array(calib["voltages"])
+            phases = np.array(calib["phases"])
+            
+            ax.plot(voltages, phases / np.pi, 'o-', color='blue', linewidth=2, markersize=3)
+            ax.set_xlabel("Voltage (V)", fontsize=12)
+            ax.set_ylabel("Phase (π rad)", fontsize=12)
+            ax.set_title(f"Input {ch_idx + 1} - Channel {channel}", fontsize=14)
+            ax.grid(True, alpha=0.3)
+            
+            # Add text annotation for slope
+            if len(voltages) > 1:
+                slope = (phases[-1] - phases[0]) / (voltages[-1] - voltages[0])
+                ax.text(0.05, 0.95, f"Slope: {slope/np.pi:.2f}π/V", 
+                       transform=ax.transAxes, fontsize=10, verticalalignment='top',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        
+        plt.suptitle("Phase Shifter Calibration", fontsize=16, fontweight="bold")
+        plt.tight_layout()
+        
+        # Save figure
+        calib_plot_file = output_path / "Shifter_Calibration.png"
+        plt.savefig(calib_plot_file, dpi=300, bbox_inches="tight")
+        print(f"Calibration plot saved to {calib_plot_file}\n")
+        
+        plt.show()
+    else:
+        print()
+    
+    return calibration_data
+
+
+def voltage_from_phase(target_phase: float,
+                       calibration_data: Dict,
+                       channel_key: str) -> float:
+    """
+    Calculate voltage needed to achieve target phase using calibration data.
+    
+    Uses linear interpolation between calibration points.
+    
+    Parameters
+    ----------
+    target_phase : float
+        Desired phase shift in radians.
+    calibration_data : dict
+        Calibration dictionary from characterize_phase_shifters().
+    channel_key : str
+        Channel key in format "channel_XX" (e.g., "channel_17").
+    
+    Returns
+    -------
+    float
+        Voltage in V to achieve target phase.
+    """
+    calib = calibration_data[channel_key]
+    phases = np.array(calib["phases"])
+    voltages = np.array(calib["voltages"])
+    
+    # Clip target phase to calibration range
+    target_phase = np.clip(target_phase, phases.min(), phases.max())
+    
+    # Linear interpolation
+    voltage = np.interp(target_phase, phases, voltages)
+    
+    return voltage
 
 
 def block_inputs(dm: DM, 
@@ -191,12 +371,13 @@ def scan_piston_dm(dm: Optional[DM],
 
 def scan_piston_shifters(chip: Optional[Chip],
                           active_inputs: List[int],
+                          calibration_data: Optional[Dict] = None,
                           wavelength: float = 1550.0,
                           n_steps: int = 50,
                           crosstalk: float = 0.0,
-                          max_current: float = 20.0) -> Tuple[np.ndarray, np.ndarray]:
+                          current: float = 0.3) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Scan piston from 0 to 2λ using phase shifters.
+    Scan piston from 0 to 2λ using phase shifters with calibration.
     
     Parameters
     ----------
@@ -204,14 +385,17 @@ def scan_piston_shifters(chip: Optional[Chip],
         Photonic chip instance. If None and in sandbox mode, simulates scan.
     active_inputs : List[int]
         Indices of inputs to activate (0-3).
+    calibration_data : dict, optional
+        Calibration data from characterize_phase_shifters(). If None, uses
+        simple linear model (phase proportional to voltage).
     wavelength : float, optional
         Wavelength in nm. Default is 1550 nm.
     n_steps : int, optional
         Number of piston steps. Default is 50.
     crosstalk : float, optional
-        Crosstalk coefficient. Default is 0.05.
-    max_current : float, optional
-        Maximum current in mA for 2λ phase shift. Default is 20 mA.
+        Crosstalk coefficient. Default is 0.0.
+    current : float, optional
+        Current in A. Default is 0.3 A.
     
     Returns
     -------
@@ -223,32 +407,45 @@ def scan_piston_shifters(chip: Optional[Chip],
     # Shifter channels for N4x4-T8 (architecture 6): 17, 18, 19, 20
     shifter_channels = [17, 18, 19, 20]
     
-    # Current scan (proportional to phase shift)
-    currents = np.linspace(0, max_current, n_steps)
+    # Phase scan from 0 to 4π (equivalent to 2λ piston)
+    target_phases = np.linspace(0, 4 * np.pi, n_steps)
     pistons = np.linspace(0, 2 * wavelength, n_steps)
     intensities = np.zeros((n_steps, 4))
     
     # Input amplitudes
     input_amps = np.array([1.0 if i in active_inputs else 0.0 for i in range(4)])
     
+    # Determine voltages for each phase step
+    if calibration_data is not None:
+        # Use calibration data with interpolation
+        scanned_channel_key = f"channel_{shifter_channels[active_inputs[-1]]}"
+        voltages = np.array([voltage_from_phase(phase, calibration_data, scanned_channel_key) 
+                            for phase in target_phases])
+    else:
+        # Simple linear model: phase = π * V (at current = 0.3A)
+        voltages = target_phases / np.pi
+    
     if chip is not None and not SANDBOX_MODE:
         # Reset all shifters in real mode
         for ch in shifter_channels:
-            chip[ch].set_current(0.0)
+            chip[ch].set_voltage(0.0)
+            chip[ch].set_current(current)
     
-    for i, current in enumerate(currents):
+    for i, (voltage, target_phase) in enumerate(zip(voltages, target_phases)):
         if chip is not None and not SANDBOX_MODE:
-            # Apply current to highest numbered active shifter
+            # Apply voltage to highest numbered active shifter
+            chip[shifter_channels[active_inputs[-1]]].set_voltage(voltage)
             chip[shifter_channels[active_inputs[-1]]].set_current(current)
             # Keep other active shifters at 0
             for inp_idx in active_inputs[:-1]:
-                chip[shifter_channels[inp_idx]].set_current(0)
+                chip[shifter_channels[inp_idx]].set_voltage(0.0)
+                chip[shifter_channels[inp_idx]].set_current(current)
             time.sleep(0.05)  # Stabilization time
         
-        # Phase from current (2π per max_current)
+        # Phase from target (already calculated)
         # The highest numbered active input gets the phase scan, others stay at 0
         phases = np.zeros(4)
-        phases[active_inputs[-1]] = 2 * np.pi * currents[i] / max_current
+        phases[active_inputs[-1]] = target_phase
         
         # Acquire intensities (simulated or real)
         intensities[i] = acquire(input_amps, phases, crosstalk)
@@ -256,7 +453,7 @@ def scan_piston_shifters(chip: Optional[Chip],
     # Reset shifters if in real mode
     if chip is not None and not SANDBOX_MODE:
         for ch in shifter_channels:
-            chip[ch].set_current(0.0)
+            chip[ch].set_voltage(0.0)
     
     return pistons, intensities
 
@@ -265,6 +462,7 @@ def characterize_single_inputs(dm: Optional[DM] = None,
                                 chip: Optional[Chip] = None,
                                 segments: List[int] = [111, 112, 113, 114],
                                 use_shifters: bool = False,
+                                calibration_data: Optional[Dict] = None,
                                 wavelength: float = 1550.0,
                                 n_steps: int = 50,
                                 crosstalk: float = 0.0,
@@ -312,7 +510,7 @@ def characterize_single_inputs(dm: Optional[DM] = None,
             if chip is None and not SANDBOX_MODE:
                 raise ValueError("Chip instance required when use_shifters=True")
             pistons, intensities = scan_piston_shifters(
-                chip, active, wavelength, n_steps, crosstalk
+                chip, active, calibration_data, wavelength, n_steps, crosstalk
             )
         else:
             if dm is None and not SANDBOX_MODE:
@@ -334,6 +532,7 @@ def characterize_dual_inputs(dm: Optional[DM] = None,
                               chip: Optional[Chip] = None,
                               segments: List[int] = [111, 112, 113, 114],
                               use_shifters: bool = False,
+                              calibration_data: Optional[Dict] = None,
                               wavelength: float = 1550.0,
                               n_steps: int = 50,
                               crosstalk: float = 0.0,
@@ -378,7 +577,7 @@ def characterize_dual_inputs(dm: Optional[DM] = None,
             if chip is None and not SANDBOX_MODE:
                 raise ValueError("Chip instance required when use_shifters=True")
             pistons, intensities = scan_piston_shifters(
-                chip, [i, j], wavelength, n_steps, crosstalk
+                chip, [i, j], calibration_data, wavelength, n_steps, crosstalk
             )
         else:
             if dm is None and not SANDBOX_MODE:
@@ -662,17 +861,30 @@ def run_full_characterization(dm: Optional[DM] = None,
     print(f"Output directory: {output_path}")
     print("=" * 70)
     
+    # Characterize phase shifters if using them
+    calibration_data = None
+    if use_shifters:
+        calibration_data = characterize_phase_shifters(
+            chip, 
+            wavelength=wavelength, 
+            current=0.3,
+            v_max=5.0,
+            n_steps=50,
+            output_dir=str(output_path),
+            verbose=verbose
+        )
+    
     # Characterize single inputs
     print("\n### SINGLE INPUT CHARACTERIZATION ###")
     single_results = characterize_single_inputs(
-        dm, chip, segments, use_shifters, wavelength, n_steps, crosstalk, str(output_path)
+        dm, chip, segments, use_shifters, calibration_data, wavelength, n_steps, crosstalk, str(output_path)
     )
     plot_results(single_results, "Single Input Characterization", str(output_path), verbose)
     
     # Characterize dual inputs
     print("\n### DUAL INPUT CHARACTERIZATION ###")
     dual_results = characterize_dual_inputs(
-        dm, chip, segments, use_shifters, wavelength, n_steps, crosstalk, str(output_path)
+        dm, chip, segments, use_shifters, calibration_data, wavelength, n_steps, crosstalk, str(output_path)
     )
     plot_results(dual_results, "Dual Input Characterization", str(output_path), verbose)
     
@@ -696,7 +908,7 @@ if __name__ == "__main__":
             use_shifters=False,
             wavelength=1550.0,
             n_steps=30,
-            crosstalk=0.0,
+            crosstalk=0.5,
             output_dir="generated/N4x4_T8_characterization/"
         )
     else:
