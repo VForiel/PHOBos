@@ -1,7 +1,7 @@
 # Zaber
 
 ```{eval-rst}
-.. autoclass:: kbench.Zaber
+.. autoclass:: kbench.classes.pupil_mask.Zaber
    :members:
    :show-inheritance:
 ```

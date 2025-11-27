@@ -1,6 +1,6 @@
 sphinx
 myst-parser
-furo
+sphinx-breeze-theme
 linkify-it-py
 sphinx-copybutton
 pyyaml

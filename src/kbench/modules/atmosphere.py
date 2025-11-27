@@ -9,9 +9,6 @@ def atmo_screen_kolmogorov(size, physical_size, r0, L0, fc=25, correc=1.0):
     """
     Generate a Kolmogorov-Von Karman type atmospheric phase screen.
     
-    Adapted from XAOsim (Carbillet & Riccardi, 2010).
-    http://cdsads.u-strasbg.fr/abs/2010ApOpt..49G..47C
-    
     Parameters
     ----------
     size : int

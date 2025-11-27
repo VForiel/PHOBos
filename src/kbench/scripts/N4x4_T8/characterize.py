@@ -914,30 +914,14 @@ if __name__ == "__main__":
     else:
         print("✅ Running in CONTROL mode (hardware available)")
         print("\nInitializing hardware for N4x4-T8 characterization...\n")
-        
-        # Real hardware mode - create instances
-        try:
-            dm = DM()
-            run_full_characterization(
-                dm=dm,
-                chip=None,
-                segments=[111, 112, 113, 114],
-                use_shifters=False,
-                wavelength=1550.0,
-                n_steps=50,
-                crosstalk=0.0,
-                output_dir="generated/N4x4_T8_characterization/"
-            )
-        except Exception as e:
-            print(f"Error during hardware operation: {e}")
-            print("\nFalling back to simulation mode...\n")
-            run_full_characterization(
-                dm=None,
-                chip=None,
-                segments=[111, 112, 113, 114],
-                use_shifters=False,
-                wavelength=1550.0,
-                n_steps=30,
-                crosstalk=0.0,
-                output_dir="generated/N4x4_T8_characterization/"
-            )
+    
+        dm = DM()
+        run_full_characterization(
+            dm=dm,
+            chip=None,
+            segments=[111, 112, 113, 114],
+            use_shifters=False,
+            wavelength=1550.0,
+            n_steps=50,
+            output_dir="generated/N4x4_T8_characterization/"
+        )

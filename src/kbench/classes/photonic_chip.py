@@ -1,3 +1,59 @@
+"""
+Photonic Chip Control Module.
+
+This module provides a high-level interface for controlling photonic integrated circuits
+via the XPOW controller. It supports multiple chip architectures with thermo-optic phase
+actuators (TOPAs) for kernel-nulling interferometry applications.
+
+Classes
+-------
+Channel
+    Represents a single channel on the photonic chip, providing intuitive control of
+    voltage and current for individual TOPAs.
+    
+Chip
+    Main class for interfacing with the XPOW controller via serial communication.
+    Supports 20 different photonic chip architectures including:
+    - Mach-Zehnder Interferometers (MZI)
+    - Multi-Mode Interferometers (MMI): 1x2, 2x2, 4x4
+    - Kernel Nullers: 2x2, 3x3, 4x4 configurations
+    - Phase shifters and phase modulators
+    
+Key Features
+------------
+- Channel-wise voltage and current control (0-5V, 0-300mA)
+- Architecture-specific channel mapping for TOPAs
+- Automatic calibration support for voltage/current coefficients
+- Feedback control to ensure setpoints are reached within tolerance
+- Sandbox mode for testing without hardware
+- Serial communication with XPOW controller (115200 baud)
+
+Examples
+--------
+Control a single channel directly:
+
+>>> chip = Chip()
+>>> chip[17].set_voltage(2.5)  # Set 2.5V on channel 17
+>>> chip[17].ensure_current(50.0, tolerance=0.5)  # Ensure 50mA ±0.5mA
+
+Control multiple channels for architecture 6 (N4x4-T8):
+
+>>> arch = Chip.ARCHS[6]
+>>> for topa in arch['topas']:
+...     chip[topa].set_current(10.0)
+
+Notes
+-----
+The XPOW controller documentation can be found in "docs/hardware_documentation/XPOW.pdf".
+Voltage and current coefficients are calibrated empirically and stored in CUR_COEFFS
+and VOLT_COEFFS arrays. Use update_coeffs() to refine calibration.
+
+See Also
+--------
+kbench.classes.deformable_mirror : DM control for complementary phase control
+kbench.scripts.N4x4_T8.characterize : Characterization script for 4x4 MMI
+"""
+
 import numpy as np
 from .. import serial
 import time
@@ -16,27 +72,105 @@ class Channel:
         self.channel = channel_number
         
     def set_current(self, current: float, verbose: bool = False):
-        """Set current for this channel in mA."""
+        """
+        Set current for this channel.
+        
+        Parameters
+        ----------
+        current : float
+            Target current in mA.
+        verbose : bool, optional
+            If True, print command details. Default is False.
+        """
         Chip.set_current(self.channel, current, verbose=verbose)
         
     def set_voltage(self, voltage: float, verbose: bool = False):
-        """Set voltage for this channel in V.""" 
+        """
+        Set voltage for this channel.
+        
+        Parameters
+        ----------
+        voltage : float
+            Target voltage in V.
+        verbose : bool, optional
+            If True, print command details. Default is False.
+        """ 
         Chip.set_voltage(self.channel, voltage, verbose=verbose)
         
     def get_current(self, verbose: bool = False) -> float:
-        """Get current for this channel in mA."""
+        """
+        Query measured current for this channel.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Measured current in mA.
+        """
         return Chip.get_current(self.channel, verbose=verbose)
         
     def get_voltage(self, verbose: bool = False) -> float:
-        """Get voltage for this channel in V."""
+        """
+        Query measured voltage for this channel.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Measured voltage in V.
+        """
         return Chip.get_voltage(self.channel, verbose=verbose)
         
     def ensure_current(self, current: float, tolerance: float = 0.1, max_attempts: int = 100, verbose: bool = False):
-        """Ensure current reaches target within tolerance."""
+        """
+        Iteratively adjust current until target is reached.
+        
+        Parameters
+        ----------
+        current : float
+            Target current in mA.
+        tolerance : float, optional
+            Acceptable error in mA. Default is 0.1 mA.
+        max_attempts : int, optional
+            Maximum adjustment iterations. Default is 100.
+        verbose : bool, optional
+            If True, print adjustment details. Default is False.
+            
+        Returns
+        -------
+        float
+            Correction factor applied.
+        """
         return Chip.ensure_current(self.channel, current, tolerance, max_attempts, verbose=verbose)
         
     def ensure_voltage(self, voltage: float, tolerance: float = 0.01, max_attempts: int = 100, verbose: bool = False):
-        """Ensure voltage reaches target within tolerance."""
+        """
+        Iteratively adjust voltage until target is reached.
+        
+        Parameters
+        ----------
+        voltage : float
+            Target voltage in V.
+        tolerance : float, optional
+            Acceptable error in V. Default is 0.01 V.
+        max_attempts : int, optional
+            Maximum adjustment iterations. Default is 100.
+        verbose : bool, optional
+            If True, print adjustment details. Default is False.
+            
+        Returns
+        -------
+        float
+            Correction factor applied.
+        """
         return Chip.ensure_voltage(self.channel, voltage, tolerance, max_attempts, verbose=verbose)
 
 class Chip:
@@ -201,7 +335,24 @@ class Chip:
     SERIAL = None
 
     def __init__(self, arch:int):
-
+        """
+        Initialize a Chip instance for a specific architecture.
+        
+        Parameters
+        ----------
+        arch : int
+            Architecture number (1-20). See ARCHS dictionary for available architectures.
+            
+        Raises
+        ------
+        ValueError
+            If the specified architecture number is invalid.
+            
+        Notes
+        -----
+        This method automatically creates Channel objects for all TOPAs in the
+        specified architecture and establishes serial connection to the XPOW controller.
+        """
         if arch not in Chip.ARCHS:
             raise ValueError(f"❌ Unvalid architecture {arch}. Available architectures are: {list(Chip.ARCHS.keys())}")
 
@@ -221,6 +372,27 @@ class Chip:
 
     @classmethod
     def connect(cls):
+        """
+        Establish serial connection to the XPOW controller.
+        
+        Returns
+        -------
+        serial.Serial
+            Active serial connection object.
+            
+        Raises
+        ------
+        ConnectionError
+            If the XPOW controller does not respond correctly.
+            
+        Notes
+        -----
+        - In sandbox mode, uses '/dev/ttyACM0' as default port
+        - In normal mode, auto-detects XPOW via USB VID:PID (2341:8036)
+        - Baudrate: 115200 baud
+        - Timeout: 1.0 second
+        - Connection is persistent across multiple Chip instances
+        """
         if Chip.SERIAL is None:
             # Setup serial connection
             if SANDBOX_MODE:
@@ -232,11 +404,19 @@ class Chip:
             # Check connexion
             res = cls.send_command("*IDN?")
             if "XPOW" not in res:
-                raise ConnectionError(f"❌ No response from the XPOW controller on port {port} at {baudrate} bauds. Response was: {res}")
+                raise ConnectionError(f"❌ No response from the XPOW controller on port {port} at 115200 bauds. Response was: {res}")
         return cls.SERIAL
     
     @classmethod
     def disconnect(cls):
+        """
+        Close the serial connection to the XPOW controller.
+        
+        Notes
+        -----
+        This method is automatically called when the program exits, but can be
+        called manually to release the serial port.
+        """
         if cls.SERIAL is not None:
             cls.SERIAL.close()
             cls.SERIAL = None
@@ -251,7 +431,32 @@ class Chip:
 
     @classmethod
     def send_command(cls, cmd: str, verbose: bool = False, output=True) -> str:
-        # Send a command to the XPOW and return the answer
+        """
+        Send a command to the XPOW controller and return the response.
+        
+        Parameters
+        ----------
+        cmd : str
+            Command string to send (without newline terminator).
+        verbose : bool, optional
+            If True, print transmitted and received messages. Default is False.
+        output : bool, optional
+            If True, wait for and return response. Default is True.
+            
+        Returns
+        -------
+        str or None
+            Response from XPOW controller if output=True, None otherwise.
+            
+        Notes
+        -----
+        Common XPOW commands:
+        
+        - ``*IDN?`` : Query device identification
+        - ``CH:X:CUR:Y`` : Set current Y on channel X
+        - ``CH:X:VOLT:Y`` : Set voltage Y on channel X
+        - ``CH:X:VAL?`` : Query voltage and current on channel X
+        """
         cmd_line = cmd + "\n"
         cls.connect()
         cls.SERIAL.flushInput()
@@ -333,21 +538,80 @@ class Chip:
 
     @classmethod
     def set_current(cls, channel: int, current: float, verbose: bool = False, output=False):
-        """Set current for a specific channel (absolute channel number)."""
+        """
+        Set current for a specific channel.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        current : float
+            Target current in mA. Automatically clamped to [0, MAX_CURRENT].
+        verbose : bool, optional
+            If True, print command details. Default is False.
+        output : bool, optional
+            If True, wait for controller response. Default is False.
+            
+        Notes
+        -----
+        The actual value sent to the controller is scaled by CUR_COEFFS[channel-1]
+        to account for hardware calibration. Values outside [0, 300] mA are clamped.
+        """
         current = max(0, min(cls.MAX_CURRENT, current))  # Clamp to valid range
         current_value = current * cls.CUR_COEFFS[channel-1]
         cls.send_command(f"CH:{channel}:CUR:{int(current_value)}", verbose=verbose, output=output)
 
     @classmethod
     def set_voltage(cls, channel: int, voltage: float, verbose: bool = False, output=False):
-        """Set voltage for a specific channel (absolute channel number)."""
+        """
+        Set voltage for a specific channel.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        voltage : float
+            Target voltage in V. Automatically clamped to [0, MAX_VOLTAGE].
+        verbose : bool, optional
+            If True, print command details. Default is False.
+        output : bool, optional
+            If True, wait for controller response. Default is False.
+            
+        Notes
+        -----
+        The actual value sent to the controller is scaled by VOLT_COEFFS[channel-1]
+        to account for hardware calibration. Values outside [0, 5] V are clamped.
+        """
         voltage = max(0, min(cls.MAX_VOLTAGE, voltage))  # Clamp to valid range
         voltage_value = voltage * cls.VOLT_COEFFS[channel-1]
         cls.send_command(f"CH:{channel}:VOLT:{int(voltage_value)}", verbose=verbose, output=output)
 
     @classmethod
     def get_current(cls, channel: int, verbose: bool = False) -> float:
-        """Get current for a specific channel (absolute channel number)."""
+        """
+        Query measured current for a specific channel.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Measured current in mA.
+            
+        Raises
+        ------
+        ValueError
+            If the controller response cannot be parsed.
+            
+        Notes
+        -----
+        Sends "CH:X:VAL?" command and parses response format "=YV, ZmA".
+        """
         res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
         match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
@@ -358,7 +622,30 @@ class Chip:
 
     @classmethod
     def get_voltage(cls, channel: int, verbose: bool = False) -> float:
-        """Get voltage for a specific channel (absolute channel number)."""
+        """
+        Query measured voltage for a specific channel.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Measured voltage in V.
+            
+        Raises
+        ------
+        ValueError
+            If the controller response cannot be parsed.
+            
+        Notes
+        -----
+        Sends "CH:X:VAL?" command and parses response format "=YV, ZmA".
+        """
         res = cls.send_command(f"CH:{channel}:VAL?", verbose=verbose)
         # Regex to extract the value from the response
         match = re.search(r'=\s*([\d\.]+)V,\s*([\d\.]+)mA', res)
@@ -369,7 +656,37 @@ class Chip:
 
     @classmethod
     def ensure_current(cls, channel: int, current: float, tolerance: float = 0.1, max_attempts: int = 100, verbose: bool = False):
-        """Ensure that the current setpoint is reached within the specified tolerance."""
+        """
+        Iteratively adjust current until target is reached within tolerance.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        current : float
+            Target current in mA.
+        tolerance : float, optional
+            Acceptable error in mA. Default is 0.1 mA.
+        max_attempts : int, optional
+            Maximum number of adjustment iterations. Default is 100.
+        verbose : bool, optional
+            If True, print adjustment details. Default is False.
+            
+        Returns
+        -------
+        float
+            Correction factor applied (final_setpoint / target).
+            
+        Raises
+        ------
+        RuntimeError
+            If target cannot be reached within tolerance after max_attempts.
+            
+        Notes
+        -----
+        Uses proportional control with factor 0.5 to converge to target.
+        Useful for compensating thermal drift or controller nonlinearity.
+        """
         attempts = 0
         step_current = current
         while attempts < max_attempts:
@@ -387,7 +704,37 @@ class Chip:
         
     @classmethod
     def ensure_voltage(cls, channel: int, voltage: float, tolerance: float = 0.01, max_attempts: int = 100, verbose: bool = False):
-        """Ensure that the voltage setpoint is reached within the specified tolerance."""
+        """
+        Iteratively adjust voltage until target is reached within tolerance.
+        
+        Parameters
+        ----------
+        channel : int
+            Absolute channel number (1-40).
+        voltage : float
+            Target voltage in V.
+        tolerance : float, optional
+            Acceptable error in V. Default is 0.01 V.
+        max_attempts : int, optional
+            Maximum number of adjustment iterations. Default is 100.
+        verbose : bool, optional
+            If True, print adjustment details. Default is False.
+            
+        Returns
+        -------
+        float
+            Correction factor applied (final_setpoint / target).
+            
+        Raises
+        ------
+        RuntimeError
+            If target cannot be reached within tolerance after max_attempts.
+            
+        Notes
+        -----
+        Uses proportional control with factor 0.5 to converge to target.
+        Useful for compensating thermal drift or controller nonlinearity.
+        """
         attempts = 0
         step_voltage = voltage
         while attempts < max_attempts:
@@ -405,6 +752,18 @@ class Chip:
 
     @classmethod
     def turn_off(cls, verbose: bool = False):
-        """Turn off all channels."""
+        """
+        Set voltage and current to zero on all channels.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print shutdown commands. Default is False.
+            
+        Notes
+        -----
+        This is a safety method to ensure all TOPAs are powered down.
+        Affects all 40 channels simultaneously.
+        """
         cls.send_command(f"CH:1-{cls.N_CHANNELS}:CUR:0", verbose=verbose)
         cls.send_command(f"CH:1-{cls.N_CHANNELS}:VOLT:0", verbose=verbose)

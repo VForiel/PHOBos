@@ -1,7 +1,7 @@
 # Segment
 
 ```{eval-rst}
-.. autoclass:: kbench.Segment
+.. autoclass:: kbench.classes.deformable_mirror.Segment
    :members:
    :show-inheritance:
 ```

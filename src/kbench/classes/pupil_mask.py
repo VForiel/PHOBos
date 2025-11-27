@@ -11,7 +11,8 @@ class PupilMask():
     """
     Class to control the mask wheel in the optical system.
     
-    ⚠️ It is highly recommended to reset the mask to the home position using the `reset=True` parameter when initalizing the PupilMask object.
+    .. warning::
+        It is highly recommended to reset the mask to the home position using the `reset=True` parameter when initializing the PupilMask object.
 
     Attributes
     ----------
@@ -42,7 +43,8 @@ class PupilMask():
         """
         Initialize the PupilMask class.
 
-        ⚠️ It is highly recommended to reset the mask to the home position using the `reset=True` parameter.
+        .. warning::
+            It is highly recommended to reset the mask to the home position using the `reset=True` parameter.
 
         Parameters
         ----------
@@ -404,7 +406,8 @@ class Newport():
     """
     Class to control the Newport motor (wheel).
     
-    ⚠️ If the command sent to the Newport motor doesn't work but no error is raised, ensure the Newport know it's home position by running the `home_search()` method first.
+    .. warning::
+        If the command sent to the Newport motor doesn't work but no error is raised, ensure the Newport knows its home position by running the `home_search()` method first.
     """
 
     def __init__(self, session):

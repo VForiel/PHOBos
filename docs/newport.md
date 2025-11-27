@@ -1,7 +1,7 @@
 # Newport
 
 ```{eval-rst}
-.. autoclass:: kbench.Newport
+.. autoclass:: kbench.classes.pupil_mask.Newport
    :members:
    :show-inheritance:
 ```
