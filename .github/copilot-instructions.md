@@ -1,8 +1,22 @@
 # Copilot Instructions for Kbench-Controls
 
-## Architecture Overview
+## Project Purpose
 
-**Kbench-Controls** is a Python package for controlling optical test bench equipment in a kernel-nulling interferometry setup. The system manages three main hardware components: deformable mirrors (DM), filter wheels, and pupil masks with motion controllers.
+**Kbench-Controls** is a Python package for controlling and simulating optical test bench equipment in a kernel-nulling interferometry setup.
+
+## CRITICAL CODING STANDARDS
+
+### Language Requirements
+⚠️ **ALL code, documentation, comments, docstrings, and user-facing text MUST be in ENGLISH.**
+- No French text allowed in any part of the codebase
+- This includes: code comments, docstrings, error messages, print statements, variable names, documentation files
+- Exception: Historical commit messages may remain in French
+
+### Documentation Standards
+- Use NumPy-style docstrings for all functions and classes
+- Include type hints where applicable
+- Provide clear examples in docstrings for complex functions
+- Keep README files and documentation updated
 
 ### Core Architecture Patterns
 
@@ -87,3 +101,56 @@ The `timeit_tests.ipynb` notebook contains performance benchmarks for segment up
 2. Verify serial port permissions: `ls -la /dev/ttyUSB*`
 3. Test configuration loading: `kbch config --show`
 4. Monitor sandbox output for command simulation
+
+## Atmospheric Simulation Module
+
+### Overview
+Located in `src/kbench/modules/atmosphere.py`, this module provides Kolmogorov-Von Karman atmospheric turbulence simulation based on XAOsim.
+
+### Key Features
+- **Phase screen generation**: Kolmogorov-Von Karman power spectrum
+- **Frozen flow model**: Atmospheric turbulence evolution with wind
+- **Multi-telescope support**: Calculate OPD for multiple apertures
+- **Demo mode**: Real-time animation with matplotlib
+
+### Usage Pattern
+```python
+from kbench.modules.atmosphere import get_delays
+
+# Generate atmospheric phase delays
+delays, times = get_delays(
+    n_telescopes=4,
+    r0=0.16,           # Fried parameter @ 500nm
+    wind_speed=10.0,   # m/s
+    demo=True          # Show animation
+)
+```
+
+### Coding Conventions for Simulations
+- Use SI units in function signatures (meters, seconds, radians)
+- Return results in convenient units (nanometers for OPD)
+- Provide sensible defaults for all parameters
+- Include `demo` parameter for visualization when applicable
+
+## Testing Requirements
+
+### For Hardware Control
+- Mock all hardware interactions in tests
+- Use sandbox mode for CI/CD
+- Test configuration loading separately from hardware
+
+### For Simulations
+- Validate physical scaling laws (e.g., r0 vs wavelength)
+- Check statistical properties of generated data
+- Test with multiple parameter combinations
+- Verify output shapes and units
+
+## Code Review Checklist
+
+- [ ] All text is in English
+- [ ] Docstrings follow NumPy style
+- [ ] Type hints provided where applicable
+- [ ] Examples included for complex functions
+- [ ] Tests pass in sandbox mode
+- [ ] Configuration files validated
+- [ ] Error messages are clear and actionable

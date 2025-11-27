@@ -11,4 +11,5 @@ filter_wheel
 photonic_chip
 pupil_mask
 configuration_file
+atmosphere
 ```

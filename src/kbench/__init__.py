@@ -1,15 +1,21 @@
 import os
+import sys
 import toml
+
+# Detect if running in Sphinx documentation build
+_SPHINX_BUILD = 'sphinx' in sys.modules or os.environ.get('SPHINX_BUILD') == '1'
 
 # Automatic mode detection (control or sandbox)
 try:
     import bmc
-    print("✅ BMC lib found. Running in control mode.")
+    if not _SPHINX_BUILD:
+        print("✅ BMC lib found. Running in control mode.")
     SANDBOX_MODE = False
 except ImportError:
     from .sandbox import bmc_mock as bmc
-    print("❌ BMC lib not found. Install it via the BMC SDK.")
-    print("⛱️ Running in sandbox mode.")
+    if not _SPHINX_BUILD:
+        print("❌ BMC lib not found. Install it via the BMC SDK.")
+        print("⛱️ Running in sandbox mode.")
     SANDBOX_MODE = True
 
 # Serial library selection
@@ -21,6 +27,9 @@ else:
 # Import classes
 from .classes import PupilMask, FilterWheel, DM, Chip
 
+# Import modules
+from .modules import atmosphere
+
 # Get version from pyproject.toml
 try:
     import toml
@@ -29,8 +38,9 @@ try:
         pyproject = toml.load(f)
     __version__ = pyproject['project']['version']
 except Exception as e:
-    print("❌ Error: Could not retrieve version information.")
-    print(f"ℹ️ {e}")
+    if not _SPHINX_BUILD:
+        print("❌ Error: Could not retrieve version information.")
+        print(f"ℹ️ {e}")
 
 # Try to get current commit (if in a git repo)
 try:
@@ -42,4 +52,4 @@ except Exception:
 
 
 # Make bmc, serial and classes available for other modules
-__all__ = ['bmc', 'serial', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'SANDBOX_MODE', '__version__']
+__all__ = ['bmc', 'serial', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'atmosphere', 'SANDBOX_MODE', '__version__']

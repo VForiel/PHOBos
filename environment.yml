@@ -24,6 +24,7 @@ dependencies:
   - sphinx
   - myst-parser
   - furo
+  - astropy
   - pip:
     - linkify-it-py
     - sphinx-copybutton
