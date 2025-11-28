@@ -2,8 +2,8 @@
 Photonic Chip Control Module.
 
 This module provides a high-level interface for controlling photonic integrated circuits
-via the XPOW controller. It supports multiple chip architectures with thermo-optic phase
-actuators (TOPAs) for kernel-nulling interferometry applications.
+via the XPOW-8AX-CCvCV-U controller. It supports multiple chip architectures with thermo-optic 
+phase actuators (TOPAs) for kernel-nulling interferometry applications.
 
 Classes
 -------
@@ -28,6 +28,15 @@ Key Features
 - Sandbox mode for testing without hardware
 - Serial communication with XPOW controller (115200 baud)
 
+Hardware
+--------
+XPOW-8AX-CCvCV-U Controller:
+    Product documentation: https://www.nicslab.com/product-datasheet
+    - 40 independent voltage/current channels
+    - Serial interface (USB, 115200 baud)
+    - Voltage range: 0-5V
+    - Current range: 0-300mA
+
 Examples
 --------
 Control a single channel directly:
@@ -44,7 +53,6 @@ Control multiple channels for architecture 6 (N4x4-T8):
 
 Notes
 -----
-The XPOW controller documentation can be found in "docs/hardware_documentation/XPOW.pdf".
 Voltage and current coefficients are calibrated empirically and stored in CUR_COEFFS
 and VOLT_COEFFS arrays. Use update_coeffs() to refine calibration.
 

@@ -42,7 +42,7 @@ else:
             print("⛱️ xaosim not available - Cred3 will run in mock mode")
 
 # Import classes
-from .classes import PupilMask, FilterWheel, DM, Chip, Cred3
+from .classes import PupilMask, FilterWheel, DM, Segment, Chip, Cred3
 
 # Import modules
 from .modules import atmosphere
@@ -69,4 +69,4 @@ except Exception:
 
 
 # Make bmc, serial and classes available for other modules
-__all__ = ['bmc', 'serial', 'shm', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'Cred3', 'atmosphere', 'SANDBOX_MODE', '__version__']
+__all__ = ['bmc', 'serial', 'shm', 'PupilMask', 'FilterWheel', 'DM', 'Segment', 'Chip', 'Cred3', 'atmosphere', 'SANDBOX_MODE', '__version__']
