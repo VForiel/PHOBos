@@ -15,6 +15,9 @@ dependencies = [
     "scipy",
 ]
 requires-python = ">=3.12"
+
+[project.optional-dependencies]
+camera = ["xaosim"]
 readme = "README.md"
 license = {text = "MIT"}
 classifiers = [

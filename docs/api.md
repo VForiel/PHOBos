@@ -12,6 +12,7 @@ deformable_mirror
 filter_wheel
 photonic_chip
 pupil_mask
+cred3
 ```
 
 ## Simulation Modules

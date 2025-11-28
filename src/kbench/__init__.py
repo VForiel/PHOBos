@@ -24,8 +24,25 @@ if SANDBOX_MODE:
 else:
     import serial
 
+# xaosim library selection (for Cred3 camera)
+# If in SANDBOX_MODE, use mock even if xaosim is available
+# (because we're not on the lab PC and xaosim would return garbage)
+if SANDBOX_MODE:
+    from .sandbox import xaosim_mock as xaosim
+    shm = xaosim.shm
+    if not _SPHINX_BUILD:
+        print("⛱️ xaosim mock enabled (sandbox mode)")
+else:
+    try:
+        from xaosim.shmlib import shm
+    except ImportError:
+        from .sandbox import xaosim_mock as xaosim
+        shm = xaosim.shm
+        if not _SPHINX_BUILD:
+            print("⛱️ xaosim not available - Cred3 will run in mock mode")
+
 # Import classes
-from .classes import PupilMask, FilterWheel, DM, Chip
+from .classes import PupilMask, FilterWheel, DM, Chip, Cred3
 
 # Import modules
 from .modules import atmosphere
@@ -52,4 +69,4 @@ except Exception:
 
 
 # Make bmc, serial and classes available for other modules
-__all__ = ['bmc', 'serial', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'atmosphere', 'SANDBOX_MODE', '__version__']
+__all__ = ['bmc', 'serial', 'shm', 'PupilMask', 'FilterWheel', 'DM', 'Chip', 'Cred3', 'atmosphere', 'SANDBOX_MODE', '__version__']

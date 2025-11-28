@@ -4,3 +4,4 @@ pyyaml
 toml>=0.10.2
 astropy
 scipy
+# xaosim  # Optional: Required for Cred3 camera class (Linux only)
