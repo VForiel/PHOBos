@@ -62,6 +62,14 @@ class Serial:
             print(f"⛱️ [SANDBOX] Closing serial connection: {self.port}")
             self.is_open = False
     
+    def reset_input_buffer(self):
+        """Clears the input buffer (mock implementation)."""
+        self._buffer = []
+    
+    def reset_output_buffer(self):
+        """Clears the output buffer (mock implementation - no-op)."""
+        pass
+    
     def _generate_response(self, command: str) -> str:
         """Generates a simulated response based on received command."""
         command = command.upper().strip()

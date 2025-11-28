@@ -105,7 +105,7 @@ class Cred3:
     
     def get_outputs(self, 
                    crop_centers: np.ndarray = None,
-                   crop_sizes: int | tuple = 10,
+                   crop_sizes=10,
                    subtract_dark: bool = None) -> np.ndarray:
         """
         Get the mean intensity around specified output centers.

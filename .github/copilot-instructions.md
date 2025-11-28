@@ -46,6 +46,25 @@ conda activate kbench
 pip install -e .
 ```
 
+### Testing and Execution
+⚠️ **CRITICAL: Always activate the virtual environment before running tests or Python commands**
+- This project uses a `.venv` virtual environment located at the repository root
+- Before running ANY Python code or tests, ALWAYS use: `D:/Kbench/.venv/Scripts/python.exe`
+- Never use system Python or `python` command directly
+- This ensures correct dependencies and package versions are used
+
+**Correct test execution:**
+```bash
+# Windows PowerShell
+D:/Kbench/.venv/Scripts/python.exe test_script.py
+D:/Kbench/.venv/Scripts/python.exe -c "import kbench; ..."
+```
+
+**Incorrect (DO NOT USE):**
+```bash
+python test_script.py  # ❌ Wrong - uses system Python
+```
+
 ### Working in Sandbox Mode
 When BMC SDK is not installed, the system automatically enters sandbox mode. All mock classes print debug information and simulate hardware responses. This is the default for development.
 
