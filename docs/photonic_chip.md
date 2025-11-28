@@ -1,5 +1,11 @@
 # Photonic Chip
 
+```{eval-rst}
+.. automodule:: kbench.classes.photonic_chip
+   :members:
+   :show-inheritance:
+```
+
 ## XPOW Controller
 
 The photonic chip is controlled via the **XPOW-8AX-CCvCV-U** controller from NICSLAB. 
@@ -73,11 +79,3 @@ Architecture 6 (N4x4-T8) is commonly used for 4-port kernel nulling interferomet
 :::{tip}
 Use `Chip.ARCHS[arch_number]` to access the full architecture dictionary for a specific configuration.
 :::
-
-## API Reference
-
-```{eval-rst}
-.. automodule:: kbench.classes.photonic_chip
-   :members:
-   :show-inheritance:
-```
