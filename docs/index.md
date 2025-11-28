@@ -6,6 +6,7 @@
 :maxdepth: 2
 
 bench_overview
+installation
 api
 configuration_file
 ```

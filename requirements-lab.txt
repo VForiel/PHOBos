@@ -1,0 +1,8 @@
+# Lab PC requirements (includes hardware-specific dependencies)
+# Install with: pip install -r requirements-lab.txt
+
+# Base dependencies
+-r requirements.txt
+
+# Lab-specific dependencies (Linux only)
+xaosim

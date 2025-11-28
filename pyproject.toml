@@ -6,20 +6,11 @@ authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
     {name = "mmartinod", email = "ma.martinod@free.fr"},
 ]
-dependencies = [
-    "numpy",
-    "pyserial",
-    "pyyaml",
-    "toml>=0.10.2",
-    "astropy",
-    "scipy",
-]
+dynamic = ["dependencies"]
 requires-python = ">=3.12"
-
-[project.optional-dependencies]
-camera = ["xaosim"]
 readme = "README.md"
 license = {text = "MIT"}
+
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -35,6 +26,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
 where = ["src"]

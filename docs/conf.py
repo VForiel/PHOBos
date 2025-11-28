@@ -46,7 +46,7 @@ autodoc_default_options = {
     'show-inheritance': True,
 }
 
-autodoc_mock_imports = ["bmc", "serial", "matplotlib", "matplotlib.pyplot", "matplotlib.animation"]
+autodoc_mock_imports = ["bmc", "serial", "matplotlib", "matplotlib.pyplot", "matplotlib.animation", "xaosim", "xaosim.shmlib", "astropy", "scipy", "toml"]
 
 myst_enable_extensions = [
     "amsmath",

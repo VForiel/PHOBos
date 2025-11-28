@@ -5,27 +5,21 @@ The configuration file is a YAML file that contains the settings for the Kbench 
 File example:
 
 ```yaml
-# Mask wheel ------------------------------------------------------------------
-
 mask:
-  ports:
-    newport: '/dev/ttyUSB1' # Newport wheel USB port
-    zaber: '/dev/ttyUSB2'   # Zabers USB port
-
-  slots:                    # Virtual slots 
-    'dot':                  # Name of the mask
-      x: 0                  # X-position in ticks
-      y: 0                  # Y-position in ticks
-      a: 0.0                # Angle in degree relatively
-      
-# Filter wheel ----------------------------------------------------------------
+  slots:          # Virtual slots
+    foo:          # Name of the mask
+      a: 42.0     # angle in degree
+      x: 10000    # x position in ticks
+      y: 15000    # y position in ticks
+    bar:
+      a: 60.5
+      x: 0
+      y: 0
 
 filter:
-  port: '/dev/ttyUSB0'      # Filter wheel USB port
-
-  slots:                    # Virtual slots
-    'Density50%':           # Name of the filter
-        base_slot: 1        # Physical slot
+  slots:          # Virtual slots
+    qux:          # Name of the filter
+      slot: 1     # Physical slots
 ```
 
 Virtual slots allows to abstract the physical slots of the wheels and create as many slots as you want according to the scenario. For example, you can create a virtual slot "dot" that corresponds to the physical slot 1 of the mask wheel, and a slot "shifted_dot" that is also in the physical slot 1 but with a different position of the zabers.

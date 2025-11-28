@@ -1,7 +1,17 @@
+# Base dependencies (sandbox mode - no hardware required)
 numpy
 pyserial
 pyyaml
 toml>=0.10.2
 astropy
 scipy
-# xaosim  # Optional: Required for Cred3 camera class (Linux only)
+matplotlib
+
+# Development tools (optional but recommended)
+pytest
+pytest-cov
+black
+flake8
+mypy
+jupyter
+ipython

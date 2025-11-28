@@ -1,8 +1,0 @@
-filter:
-  port: /dev/ttyUSBthorlabs
-  slots: {}
-mask:
-  ports:
-    newport: /dev/ttyUSBnewport
-    zaber: /dev/ttyUSBzaber
-  slots: {}

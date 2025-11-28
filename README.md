@@ -2,56 +2,32 @@
 
 This repo aim to provide a full set of tools to control all the devices on the Kernel-Nuller test bench.
 
+> **⚠️ Important:** This package is designed to run on the PHOTONICS lab PC with specific hardware (BMC deformable mirror, Thorlabs filter wheel, Newport/Zaber motors, C-RED3 camera). Outside this environment, the library will automatically enter **sandbox mode** and simulate missing components with mock interfaces. See the [installation guide](https://kbench.readthedocs.io/en/latest/installation.html) for proper lab PC setup.
+
 ## 🚀 Quickstart
 
 Requirements:
 - [Python 3.12](https://www.python.org/)
-- [Conda](https://docs.conda.io/en/latest/miniconda.html) (recommended)
 
-### Option 1: Installation with Conda (recommended)
+### Lab PC Installation (with hardware)
 
-1. Create and activate the conda environment
-    ```bash
-    conda env create -f environment.yml
-    conda activate photonics
-    ```
+For the lab PC with all hardware connected, follow the complete [installation guide](https://kbench.readthedocs.io/en/latest/installation.html).
 
-2. Start a Python instance
-    ```bash
-    python
-    ```
-    And import the kbench module
-    ```python
-    import kbench
-    ```
+Quick version:
+```bash
+pip install -r requirements-lab.txt
+pip install -e .
+```
 
-### Option 2: Installation with pip
+### Development/Sandbox Installation (without hardware)
 
-1. (Recommended) Create a virtual environment
-    ```bash
-    python3.12 -m venv .venv
-    ```
-    and activate it
-    ```bash
-    source .venv/bin/activate # Linux
-    .venv/Scripts/activate # Windows
-    ```
+For development or testing without hardware access:
 
-2. Install the Python module
-    ```bash
-    pip install -r requirements.txt
-    pip install -e .
-    ```
+```bash
+pip install -e .
+```
 
-3. Start a Python instance
-    ```bash
-    python
-    ```
-    And import the kbench module
-    ```python
-    import kbench
-    ```
-    You can now use all Kbench devices according to the documentation!
+The package will automatically detect missing hardware and run in **sandbox mode** with mock interfaces.
 
 ## 📚 Documentation
 
