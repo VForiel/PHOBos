@@ -56,6 +56,12 @@ class XPOW:
     CUR_CORRECTION = np.ones(N_CHANNELS)
     VOLT_CORRECTION = np.ones(N_CHANNELS)
     
+    # Power correction coefficients (calibrable, initialized to None)
+    # Stores the slope coefficient from P = slope * V² calibration
+    # Computed from 2-point measurement (1V and 30V at 300mA)
+    # Will be calibrated on first use of set_power() for each channel
+    POWER_CORRECTION = np.array([None] * N_CHANNELS)
+    
     # Phase-to-voltage conversion coefficients (radians to V)
     # PHASE_CONVERSION[ch] gives the voltage needed per radian of phase shift
     # Default: 2π phase shift at 0.6W with I=300mA → V=2V → 2V/(2π) ≈ 0.318 V/rad
@@ -348,6 +354,153 @@ class PhaseShifter:
             return float(match.group(1))
         else:
             raise ValueError(f"❌ Unable to parse voltage from response: {res}")
+    
+    def set_power(self, power: float, verbose: bool = False):
+        """
+        Set optical power for this channel.
+        
+        This method sets a fixed current of 300 mA and adjusts the voltage
+        to achieve the desired optical power. The power is proportional to V²,
+        so the voltage is computed as sqrt(power / slope).
+        
+        Parameters
+        ----------
+        power : float
+            Target optical power in watts (W).
+        verbose : bool, optional
+            If True, print command details. Default is False.
+        
+        Notes
+        -----
+        The slope coefficient is calibrated automatically on first use using
+        a 2-point measurement (1V and 30V at 300mA). The relationship is:
+        
+            P = slope * V * I
+            
+        thus, we have:
+        
+            V = sqrt(P / slope)
+        
+        Examples
+        --------
+        >>> ch = PhaseShifter(17)
+        >>> ch.set_power(0.6)  # Set to 0.6 W (auto-calibrates if needed)
+        """
+        # Auto-calibrate if not done yet
+        if _xpow.POWER_CORRECTION[self.channel - 1] is None:
+            if verbose:
+                print(f"🔧 Auto-calibrating channel {self.channel}...")
+            self.calibrate(verbose=verbose)
+        
+        # Set fixed current at 300 mA
+        self.set_current(300.0, verbose=verbose)
+        
+        # Compute voltage from power using the calibrated slope
+        # P = slope * V * I  =>  V = sqrt(P / (slope * I))
+        # I = 0.3 A (300 mA converted to amperes)
+        slope = _xpow.POWER_CORRECTION[self.channel - 1]
+        voltage = np.sqrt(power / slope)
+        
+        # Apply voltage
+        self.set_voltage(voltage, verbose=verbose)
+        
+        if verbose:
+            print(f"🔧 Channel {self.channel}: power={power:.3f} W → voltage={voltage:.3f} V @ 300 mA")
+    
+    def get_power(self, verbose: bool = False) -> float:
+        """
+        Query the current optical power based on measured voltage and current.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Measured optical power in watts (W), computed as P = V × I / 1000.
+            
+        Notes
+        -----
+        This method queries both voltage (V) and current (mA) from the XPOW
+        controller and computes electrical power: P = V × I / 1000 (converting mA to A).
+        
+        Examples
+        --------
+        >>> ch = PhaseShifter(17)
+        >>> ch.set_power(0.6)
+        >>> power = ch.get_power()
+        >>> print(f"Measured power: {power:.3f} W")
+        """
+        voltage = self.get_voltage(verbose=verbose)
+        current = self.get_current(verbose=verbose)
+        power = voltage * current / 1000.0  # Convert mA to A: P = V × I
+        
+        if verbose:
+            print(f"📊 Channel {self.channel}: V={voltage:.3f} V, I={current:.1f} mA → P={power:.3f} W")
+        
+        return power
+    
+    def calibrate(self, verbose: bool = False):
+        """
+        Calibrate power correction coefficient for this channel using 2-point measurement.
+        
+        This method measures the power at 1V and 30V with a fixed current of 300mA,
+        then computes the slope coefficient from these two points. The relationship
+        used is P = slope * V * I, where I is in amperes.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print calibration details. Default is False.
+            
+        Notes
+        -----
+        The calibration process:
+        1. Set current to 300 mA
+        2. Measure power at V = 1V
+        3. Measure power at V = 30V
+        4. Compute slope from: slope = (P2 - P1) / ((V2² - V1²) * I)
+        5. Store slope in POWER_CORRECTION[channel]
+        
+        The slope represents the proportionality constant in P = slope * V² * I.
+        
+        Examples
+        --------
+        >>> ch = PhaseShifter(17)
+        >>> ch.calibrate(verbose=True)
+        >>> ch.set_power(0.6)  # Now uses calibrated coefficient
+        """
+        if verbose:
+            print(f"🔧 Calibrating channel {self.channel} using 2-point measurement...")
+        
+        # Set fixed current at 300 mA
+        self.set_current(300.0, verbose=verbose)
+        
+        # Measure at 1V
+        self.set_voltage(1.0, verbose=verbose)
+        v1 = self.get_voltage(verbose=verbose)
+        i1 = self.get_current(verbose=verbose) / 1000.0 # Convert mA to A
+        
+        # Measure at 30V
+        self.set_voltage(30.0, verbose=verbose)
+        v2 = self.get_voltage(verbose=verbose)
+        i2 = self.get_current(verbose=verbose) / 1000.0  # Convert mA to A
+        
+        # Compute slope coefficient
+        # (the slope is coming from a potential difference between what is set and what is measured)
+        # P = slope * V * I  (with I in amperes)
+        slope = (i2 - i1) / (v2 - v1)
+        
+        # Store the slope coefficient
+        _xpow.POWER_CORRECTION[self.channel - 1] = slope
+        
+        if verbose:
+            print(f"✅ Channel {self.channel} calibrated: slope={slope:.6f}")
+        
+        # Turn off channel after calibration
+        self.turn_off(verbose=verbose)
     
     def turn_off(self, verbose: bool = False):
         """
@@ -929,6 +1082,61 @@ class Arch:
         >>> print(voltages)  # [1.52, 2.01, 2.48, 2.99]
         """
         return np.array([ch.get_voltage(verbose=verbose) for ch in self.channels])
+    
+    def set_powers(self, powers, verbose: bool = False):
+        """
+        Set optical powers for all TOPAs in this chip.
+        
+        Parameters
+        ----------
+        powers : array-like
+            Array of target powers in W (one per TOPA).
+            Length must match number of TOPAs in architecture.
+        verbose : bool, optional
+            If True, print command details. Default is False.
+            
+        Raises
+        ------
+        ValueError
+            If length of powers doesn't match number of TOPAs.
+            
+        Examples
+        --------
+        >>> chip = Arch(6)  # 4 TOPAs
+        >>> chip.set_powers([0.3, 0.4, 0.5, 0.6])
+        
+        Notes
+        -----
+        Each channel will auto-calibrate on first use if not already calibrated.
+        """
+        powers = np.asarray(powers)
+        if len(powers) != len(self.channels):
+            raise ValueError(f"❌ Expected {len(self.channels)} power values, got {len(powers)}")
+        
+        for channel, power in zip(self.channels, powers):
+            channel.set_power(power, verbose=verbose)
+    
+    def get_powers(self, verbose: bool = False) -> np.ndarray:
+        """
+        Query measured optical powers for all TOPAs in this chip.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        np.ndarray
+            Array of measured powers in W (one per TOPA).
+            
+        Examples
+        --------
+        >>> chip = Arch(6)
+        >>> powers = chip.get_powers()
+        >>> print(powers)  # [0.31, 0.42, 0.51, 0.59]
+        """
+        return np.array([ch.get_power(verbose=verbose) for ch in self.channels])
     
     def turn_off(self, verbose: bool = False):
         """
