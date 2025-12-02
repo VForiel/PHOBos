@@ -173,3 +173,17 @@ delays, times = get_delays(
 - [ ] Tests pass in sandbox mode
 - [ ] Configuration files validated
 - [ ] Error messages are clear and actionable
+
+## Backward Compatibility
+When refactoring or renaming classes, always ensure backward compatibility by keeping the old names as aliases with deprecation warnings.
+
+Example:
+```python
+class OldName(NewName):
+    def __init__(self, *args, **kwargs):
+        warnings.warn("OldName is deprecated, use NewName instead", DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
+```
+
+## Documentation
+Always document deprecated items in the code using docstrings and comments. Update the user documentation to reflect the changes but mention the deprecated items if they are still in use.

@@ -4,11 +4,12 @@ import time
 import matplotlib.pyplot as plt
 from .. import SANDBOX_MODE
 import re
+import warnings
 
 
-class XPOWController:
+class XPOW:
     """
-    Singleton class managing the serial connection to the XPOW controller.
+    Singleton class managing the serial connection to the XPOW controller. You can simply use `kbench.xpow` to access it.
     
     This class ensures a single shared connection is used by all Chip and Channel instances.
     It is automatically instantiated on first access and handles all low-level communication.
@@ -29,6 +30,10 @@ class XPOWController:
         Per-channel calibration multipliers for current (initialized to 1.0).
     VOLT_CORRECTION : np.ndarray
         Per-channel calibration multipliers for voltage (initialized to 1.0).
+
+    Access
+    ------
+    The singleton instance is available as `kbench.xpow`, `Arch.xpow`, or `PhaseShifter.xpow`.
     """
     
     _instance = None
@@ -43,7 +48,7 @@ class XPOWController:
     VOLT_CONVERSION = 65535 / 40  # DAC units per V
 
     # Securities
-    MAX_VOLTAGE = 5  # V
+    MAX_VOLTAGE = 30  # V
     MAX_CURRENT = 300  # mA
     
     # Correction coefficients (calibrable, initialized to 1.0)
@@ -51,10 +56,15 @@ class XPOWController:
     CUR_CORRECTION = np.ones(N_CHANNELS)
     VOLT_CORRECTION = np.ones(N_CHANNELS)
     
+    # Phase-to-voltage conversion coefficients (radians to V)
+    # PHASE_CONVERSION[ch] gives the voltage needed per radian of phase shift
+    # Default: 2π phase shift at 0.6W with I=300mA → V=2V → 2V/(2π) ≈ 0.318 V/rad
+    PHASE_CONVERSION = np.ones(N_CHANNELS) * (2.0 / (2 * np.pi))
+    
     def __new__(cls):
         """Singleton pattern: return existing instance or create new one."""
         if cls._instance is None:
-            cls._instance = super(XPOWController, cls).__new__(cls)
+            cls._instance = super(XPOW, cls).__new__(cls)
         return cls._instance
     
     def connect(self):
@@ -169,8 +179,8 @@ class XPOWController:
         Notes
         -----
         This method updates all 40 channels. For calibrating only specific chip
-        channels, use Chip.update_coeffs() instead. For a single channel, use
-        Channel.update_coeff().
+        channels, use Arch.update_coeffs() instead. For a single channel, use
+        PhaseShifter.update_coeff().
         
         The calibration works by:
         1. Setting known currents/voltages on each channel
@@ -179,10 +189,10 @@ class XPOWController:
         4. Updating CORRECTION[ch] = old_CORRECTION[ch] / slope
         """
         if verbose:
-            print(f"🔧 Calibrating all {XPOWController.N_CHANNELS} XPOW channels...")
+            print(f"🔧 Calibrating all {XPOW.N_CHANNELS} XPOW channels...")
         
-        for ch in range(1, XPOWController.N_CHANNELS + 1):
-            channel = Channel(ch)
+        for ch in range(1, XPOW.N_CHANNELS + 1):
+            channel = PhaseShifter(ch)
             channel.update_coeff(plot=plot, verbose=verbose)
         
         print("✅ All XPOW correction coefficients updated.")
@@ -204,23 +214,24 @@ class XPOWController:
         
         Examples
         --------
-        >>> XPOWController.turn_off()  # Turn off all channels
+        >>> XPOW.turn_off()  # Turn off all channels
         """
-        _xpow.send_command(f"CH:1-{XPOWController.N_CHANNELS}:CUR:0", verbose=verbose, output=False)
-        _xpow.send_command(f"CH:1-{XPOWController.N_CHANNELS}:VOLT:0", verbose=verbose, output=False)
+        _xpow.send_command(f"CH:1-{XPOW.N_CHANNELS}:CUR:0", verbose=verbose, output=False)
+        _xpow.send_command(f"CH:1-{XPOW.N_CHANNELS}:VOLT:0", verbose=verbose, output=False)
         if verbose:
-            print(f"✅ All {XPOWController.N_CHANNELS} XPOW channels turned off.")
+            print(f"✅ All {XPOW.N_CHANNELS} XPOW channels turned off.")
 
 # Global XPOW controller instance (singleton)
-_xpow = XPOWController()
+_xpow = XPOW()
+xpow = _xpow
 
 
-class Channel:
+class PhaseShifter:
     """
     Represents a single channel on the photonic chip.
     
     Provides an intuitive interface for controlling individual channels.
-    Channel instances are independent and access the XPOW controller directly.
+    PhaseShifter instances are independent and access the XPOW controller directly.
     
     Parameters
     ----------
@@ -231,25 +242,29 @@ class Channel:
     ----------
     channel : int
         The absolute channel number.
+    xpow : XPOW
+        Reference to the singleton XPOW controller.
         
     Examples
     --------
-    >>> ch17 = Channel(17)
+    >>> ch17 = PhaseShifter(17)
     >>> ch17.set_voltage(2.5)
     >>> current = ch17.get_current()
     """
     
+    xpow = _xpow
+
     def __init__(self, channel_number: int):
         """
-        Initialize a Channel instance.
+        Initialize a PhaseShifter instance.
         
         Parameters
         ----------
         channel_number : int
             Absolute channel number (1-40).
         """
-        if not (1 <= channel_number <= XPOWController.N_CHANNELS):
-            raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOWController.N_CHANNELS}.")
+        if not (1 <= channel_number <= XPOW.N_CHANNELS):
+            raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOW.N_CHANNELS}.")
         self.channel = channel_number
         
     def set_current(self, current: float, verbose: bool = False):
@@ -421,6 +436,70 @@ class Channel:
         if abs(error) > tolerance:
             raise RuntimeError(f"❌ Unable to reach target voltage {voltage} V on channel {self.channel} within {tolerance} V after {max_attempts} attempts.")
     
+    def set_phase(self, phase: float, current: float = 300.0, verbose: bool = False):
+        """
+        Set phase shift for this channel by varying voltage.
+        
+        The phase is assumed to be a linear function of the injected power.
+        The current is fixed at a specified value (default 300mA), and the
+        voltage is adjusted to achieve the desired phase shift.
+        
+        Parameters
+        ----------
+        phase : float
+            Target phase shift in radians.
+        current : float, optional
+            Fixed current in mA. Default is 300.0 mA.
+        verbose : bool, optional
+            If True, print command details. Default is False.
+            
+        Notes
+        -----
+        The voltage is computed as: phase * PHASE_CONVERSION[channel]
+        where PHASE_CONVERSION is the phase-to-voltage coefficient in V/rad.
+        This coefficient can be calibrated using update_phase_coeff().
+        """
+        # Set the fixed current
+        self.set_current(current, verbose=verbose)
+        
+        # Compute voltage needed for the desired phase
+        voltage = phase * _xpow.PHASE_CONVERSION[self.channel - 1]
+        
+        # Apply the voltage
+        self.set_voltage(voltage, verbose=verbose)
+        
+        if verbose:
+            print(f"🔧 Channel {self.channel}: phase={phase:.3f} rad → voltage={voltage:.3f} V @ {current:.1f} mA")
+    
+    def get_phase(self, current: float = 300.0, verbose: bool = False) -> float:
+        """
+        Query the current phase shift based on measured voltage.
+        
+        Parameters
+        ----------
+        current : float, optional
+            Reference current in mA (not actively enforced). Default is 300.0 mA.
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        float
+            Estimated phase shift in radians, computed from measured voltage.
+            
+        Notes
+        -----
+        The phase is computed as: voltage / PHASE_CONVERSION[channel]
+        This assumes the voltage-to-phase relationship is linear.
+        """
+        voltage = self.get_voltage(verbose=verbose)
+        phase = voltage / _xpow.PHASE_CONVERSION[self.channel - 1]
+        
+        if verbose:
+            print(f"📊 Channel {self.channel}: voltage={voltage:.3f} V → phase={phase:.3f} rad")
+        
+        return phase
+    
     def update_coeff(self, plot: bool = False, verbose: bool = False):
         """
         Calibrate correction coefficients for this specific channel.
@@ -440,11 +519,11 @@ class Channel:
         This method only updates the correction coefficient for this channel,
         leaving all other channels unchanged.
         """
-        test_currents = np.linspace(1, XPOWController.MAX_CURRENT, 10)
-        test_voltages = np.linspace(0.1, XPOWController.MAX_VOLTAGE, 10)
+        test_currents = np.linspace(1, XPOW.MAX_CURRENT, 10)
+        test_voltages = np.linspace(0.1, XPOW.MAX_VOLTAGE, 10)
         
         # Turn off all channels first
-        XPOWController.turn_off()
+        XPOW.turn_off()
         
         # Current calibration
         measured = []
@@ -494,12 +573,12 @@ class Channel:
         if verbose:
             print(f"✅ Channel {self.channel} calibrated: CUR={new_cur:.4f}, VOLT={new_volt:.4f}")
 
-class Chip:
+class Arch:
     """
     Class to handle a specific photonic chip architecture via the XPOW controller.
     
-    A Chip instance represents a specific architecture configuration and manages
-    a list of Channel objects corresponding to the TOPAs in that architecture.
+    A Arch instance represents a specific architecture configuration and manages
+    a list of PhaseShifter objects corresponding to the TOPAs in that architecture.
     All chip instances share the same XPOW controller connection.
     
     Parameters
@@ -521,14 +600,16 @@ class Chip:
         Number of output ports.
     topas : tuple
         Absolute channel numbers for TOPAs in this architecture.
-    channels : list[Channel]
-        List of Channel instances (indexed from 0).
+    channels : list[PhaseShifter]
+        List of PhaseShifter instances (indexed from 0).
+    xpow : XPOW
+        Reference to the singleton XPOW controller.
         
     Examples
     --------
     Create a chip with architecture 6 and control all channels:
     
-    >>> chip = Chip(6)
+    >>> chip = Arch(6)
     >>> chip.set_currents([10.0, 15.0, 20.0, 25.0])  # Set all 4 TOPAs
     >>> currents = chip.get_currents()  # Read all TOPA currents
     
@@ -687,9 +768,11 @@ class Chip:
             },
     }
 
+    xpow = _xpow
+
     def __init__(self, arch: int):
         """
-        Initialize a Chip instance for a specific architecture.
+        Initialize a Arch instance for a specific architecture.
         
         Parameters
         ----------
@@ -703,11 +786,11 @@ class Chip:
             
         Notes
         -----
-        This method automatically creates Channel objects for all TOPAs in the
+        This method automatically creates PhaseShifter objects for all TOPAs in the
         specified architecture and establishes serial connection to the XPOW controller.
         """
-        if arch not in Chip.ARCHS:
-            raise ValueError(f"❌ Invalid architecture {arch}. Available architectures are: {list(Chip.ARCHS.keys())}")
+        if arch not in Arch.ARCHS:
+            raise ValueError(f"❌ Invalid architecture {arch}. Available architectures are: {list(Arch.ARCHS.keys())}")
 
         self.name = self.ARCHS[arch]['name']
         self.id = self.ARCHS[arch]['id']
@@ -717,12 +800,12 @@ class Chip:
         self.topas = self.ARCHS[arch]['topas']
         
         # Create channel objects (list indexed from 0)
-        self.channels = [Channel(channel_num) for channel_num in self.topas]
+        self.channels = [PhaseShifter(channel_num) for channel_num in self.topas]
         
         # Ensure XPOW connection is established
         _xpow.connect()
 
-    def __getitem__(self, topa_index: int) -> Channel:
+    def __getitem__(self, topa_index: int) -> PhaseShifter:
         """
         Access channel by TOPA index (1-indexed): chip[1] returns first TOPA channel.
         
@@ -874,6 +957,61 @@ class Chip:
         if verbose:
             print(f"✅ Chip {self.name} turned off (channels {list(self.topas)}).")
 
+    def set_phases(self, phases, current: float = 300.0, verbose: bool = False):
+        """
+        Set phase shifts for all TOPAs in this chip.
+        
+        Parameters
+        ----------
+        phases : array-like
+            Array of target phase shifts in radians (one per TOPA).
+            Length must match number of TOPAs in architecture.
+        current : float, optional
+            Fixed current in mA for all channels. Default is 300.0 mA.
+        verbose : bool, optional
+            If True, print command details. Default is False.
+            
+        Raises
+        ------
+        ValueError
+            If length of phases doesn't match number of TOPAs.
+            
+        Examples
+        --------
+        >>> chip = Chip(6)  # 4 TOPAs
+        >>> chip.set_phases([0.0, np.pi/4, np.pi/2, np.pi])
+        """
+        phases = np.asarray(phases)
+        if len(phases) != len(self.channels):
+            raise ValueError(f"❌ Expected {len(self.channels)} phase values, got {len(phases)}")
+        
+        for channel, phase in zip(self.channels, phases):
+            channel.set_phase(phase, current=current, verbose=verbose)
+    
+    def get_phases(self, current: float = 300.0, verbose: bool = False) -> np.ndarray:
+        """
+        Query estimated phase shifts for all TOPAs in this chip.
+        
+        Parameters
+        ----------
+        current : float, optional
+            Reference current in mA (not actively enforced). Default is 300.0 mA.
+        verbose : bool, optional
+            If True, print query details. Default is False.
+            
+        Returns
+        -------
+        np.ndarray
+            Array of estimated phase shifts in radians (one per TOPA).
+            
+        Examples
+        --------
+        >>> chip = Chip(6)
+        >>> phases = chip.get_phases()
+        >>> print(phases)  # [0.0, 0.785, 1.571, 3.142]
+        """
+        return np.array([ch.get_phase(current=current, verbose=verbose) for ch in self.channels])
+    
     def update_coeffs(self, plot: bool = False, verbose: bool = False):
         """
         Calibrate correction coefficients for all channels in this chip architecture.
@@ -891,7 +1029,7 @@ class Chip:
         Notes
         -----
         Only updates CORRECTION coefficients for channels in self.topas.
-        For calibrating all 40 XPOW channels, use XPOWController.update_all_coeffs().
+        For calibrating all 40 XPOW channels, use XPOW.update_all_coeffs().
         """
         if verbose:
             print(f"🔧 Calibrating {len(self.channels)} channels for {self.name}...")
@@ -900,3 +1038,37 @@ class Chip:
             channel.update_coeff(plot=plot, verbose=verbose)
         
         print(f"✅ Correction coefficients updated for {self.name} (channels {list(self.topas)}).")
+
+# Backward compatibility aliases
+class XPOWController(XPOW):
+    """
+    Deprecated: Use :class:`XPOW` instead.
+
+    .. warning::
+        This class is deprecated and will be removed in a future version. Use :class:`XPOW` instead.
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn("XPOWController is deprecated, use XPOW instead", DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
+
+class Channel(PhaseShifter):
+    """
+    Deprecated: Use :class:`PhaseShifter` instead.
+
+    .. warning::
+        This class is deprecated and will be removed in a future version. Use :class:`PhaseShifter` instead.
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn("Channel is deprecated, use PhaseShifter instead", DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
+
+class Chip(Arch):
+    """
+    Deprecated: Use :class:`Arch` instead.
+
+    .. warning::
+        This class is deprecated and will be removed in a future version. Use :class:`Arch` instead.
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn("Chip is deprecated, use Arch instead", DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
