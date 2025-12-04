@@ -233,8 +233,7 @@ def characterize_phase_shifters(chip: Optional[Chip],
         calib_plot_file = output_path / "Shifter_Calibration.png"
         plt.savefig(calib_plot_file, dpi=300, bbox_inches="tight")
         print(f"Calibration plot saved to {calib_plot_file}\n")
-        
-        plt.show()
+    
     else:
         print()
     
@@ -782,8 +781,6 @@ def plot_results(results: dict,
     filepath = output_path / filename
     plt.savefig(filepath, dpi=300, bbox_inches="tight")
     print(f"Saved plot to {filepath}")
-    
-    plt.show()
 
 
 def run_full_characterization(dm: Optional[DM] = None,

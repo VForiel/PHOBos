@@ -163,7 +163,6 @@ plt.xlabel("Set Power (W)")
 plt.ylabel("Measured Power (W)")
 plt.legend()
 plt.grid()
-plt.show()
 ```
 
 ## Physical Model

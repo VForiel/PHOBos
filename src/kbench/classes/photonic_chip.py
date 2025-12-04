@@ -713,7 +713,6 @@ class PhaseShifter:
             plt.title(f'Voltage Calibration CH{self.channel}')
             plt.legend()
             plt.tight_layout()
-            plt.show()
         
         if verbose:
             print(f"✅ Channel {self.channel} calibrated: CUR={new_cur:.4f}, VOLT={new_volt:.4f}")
@@ -1376,7 +1375,6 @@ class Arch:
             # Hide unused subplots
             for j in range(len(self.channels), len(axs)):
                 axs[j].axis('off')
-            plt.show()
             
         if verbose:
             print("✅ Phase calibration completed.")

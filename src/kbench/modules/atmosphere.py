@@ -339,7 +339,6 @@ def get_delays(
         )
         
         plt.tight_layout()
-        plt.show()
         
     else:
         # Calculation without display
