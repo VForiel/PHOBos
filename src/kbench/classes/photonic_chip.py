@@ -2,6 +2,7 @@ import numpy as np
 from .. import serial
 import time
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 from .. import SANDBOX_MODE
 import re
 import warnings
@@ -62,10 +63,10 @@ class XPOW:
     # Will be calibrated on first use of set_power() for each channel
     POWER_CORRECTION = np.array([None] * N_CHANNELS)
     
-    # Phase-to-voltage conversion coefficients (radians to V)
-    # PHASE_CONVERSION[ch] gives the voltage needed per radian of phase shift
-    # Default: 2π phase shift at 0.6W with I=300mA → V=2V → 2V/(2π) ≈ 0.318 V/rad
-    PHASE_CONVERSION = np.ones(N_CHANNELS) * (2.0 / (2 * np.pi))
+    # Phase-to-power conversion coefficients (radians to W)
+    # PHASE_CONVERSION[ch] gives the power needed per radian of phase shift
+    # Default: 2π phase shift at 0.6W → 0.6/(2π) ≈ 0.095 W/rad
+    PHASE_CONVERSION = np.ones(N_CHANNELS) * (0.6 / (2 * np.pi))
     
     def __new__(cls):
         """Singleton pattern: return existing instance or create new one."""
@@ -589,67 +590,58 @@ class PhaseShifter:
         if abs(error) > tolerance:
             raise RuntimeError(f"❌ Unable to reach target voltage {voltage} V on channel {self.channel} within {tolerance} V after {max_attempts} attempts.")
     
-    def set_phase(self, phase: float, current: float = 300.0, verbose: bool = False):
+    def set_phase(self, phase: float, verbose: bool = False):
         """
-        Set phase shift for this channel by varying voltage.
+        Set phase shift for this channel by varying power.
         
         The phase is assumed to be a linear function of the injected power.
-        The current is fixed at a specified value (default 300mA), and the
-        voltage is adjusted to achieve the desired phase shift.
         
         Parameters
         ----------
         phase : float
             Target phase shift in radians.
-        current : float, optional
-            Fixed current in mA. Default is 300.0 mA.
         verbose : bool, optional
             If True, print command details. Default is False.
             
         Notes
         -----
-        The voltage is computed as: phase * PHASE_CONVERSION[channel]
-        where PHASE_CONVERSION is the phase-to-voltage coefficient in V/rad.
-        This coefficient can be calibrated using update_phase_coeff().
+        The power is computed as: phase * PHASE_CONVERSION[channel]
+        where PHASE_CONVERSION is the phase-to-power coefficient in W/rad.
+        This coefficient can be calibrated using Arch.calibrate_phase().
         """
-        # Set the fixed current
-        self.set_current(current, verbose=verbose)
+        # Compute power needed for the desired phase
+        power = phase * _xpow.PHASE_CONVERSION[self.channel - 1]
         
-        # Compute voltage needed for the desired phase
-        voltage = phase * _xpow.PHASE_CONVERSION[self.channel - 1]
-        
-        # Apply the voltage
-        self.set_voltage(voltage, verbose=verbose)
+        # Apply the power
+        self.set_power(power, verbose=verbose)
         
         if verbose:
-            print(f"🔧 Channel {self.channel}: phase={phase:.3f} rad → voltage={voltage:.3f} V @ {current:.1f} mA")
+            print(f"🔧 Channel {self.channel}: phase={phase:.3f} rad → power={power:.3f} W")
     
-    def get_phase(self, current: float = 300.0, verbose: bool = False) -> float:
+    def get_phase(self, verbose: bool = False) -> float:
         """
-        Query the current phase shift based on measured voltage.
+        Query the current phase shift based on set power.
         
         Parameters
         ----------
-        current : float, optional
-            Reference current in mA (not actively enforced). Default is 300.0 mA.
         verbose : bool, optional
             If True, print query details. Default is False.
             
         Returns
         -------
         float
-            Estimated phase shift in radians, computed from measured voltage.
+            Estimated phase shift in radians, computed from measured power.
             
         Notes
         -----
-        The phase is computed as: voltage / PHASE_CONVERSION[channel]
-        This assumes the voltage-to-phase relationship is linear.
+        The phase is computed as: power / PHASE_CONVERSION[channel]
+        This assumes the power-to-phase relationship is linear.
         """
-        voltage = self.get_voltage(verbose=verbose)
-        phase = voltage / _xpow.PHASE_CONVERSION[self.channel - 1]
+        power = self.get_power(verbose=verbose)
+        phase = power / _xpow.PHASE_CONVERSION[self.channel - 1]
         
         if verbose:
-            print(f"📊 Channel {self.channel}: voltage={voltage:.3f} V → phase={phase:.3f} rad")
+            print(f"📊 Channel {self.channel}: power={power:.3f} W → phase={phase:.3f} rad")
         
         return phase
     
@@ -1165,7 +1157,7 @@ class Arch:
         if verbose:
             print(f"✅ Chip {self.name} turned off (channels {list(self.topas)}).")
 
-    def set_phases(self, phases, current: float = 300.0, verbose: bool = False):
+    def set_phases(self, phases, verbose: bool = False):
         """
         Set phase shifts for all TOPAs in this chip.
         
@@ -1174,8 +1166,6 @@ class Arch:
         phases : array-like
             Array of target phase shifts in radians (one per TOPA).
             Length must match number of TOPAs in architecture.
-        current : float, optional
-            Fixed current in mA for all channels. Default is 300.0 mA.
         verbose : bool, optional
             If True, print command details. Default is False.
             
@@ -1194,16 +1184,14 @@ class Arch:
             raise ValueError(f"❌ Expected {len(self.channels)} phase values, got {len(phases)}")
         
         for channel, phase in zip(self.channels, phases):
-            channel.set_phase(phase, current=current, verbose=verbose)
+            channel.set_phase(phase, verbose=verbose)
     
-    def get_phases(self, current: float = 300.0, verbose: bool = False) -> np.ndarray:
+    def get_phases(self, verbose: bool = False) -> np.ndarray:
         """
         Query estimated phase shifts for all TOPAs in this chip.
         
         Parameters
         ----------
-        current : float, optional
-            Reference current in mA (not actively enforced). Default is 300.0 mA.
         verbose : bool, optional
             If True, print query details. Default is False.
             
@@ -1218,7 +1206,7 @@ class Arch:
         >>> phases = chip.get_phases()
         >>> print(phases)  # [0.0, 0.785, 1.571, 3.142]
         """
-        return np.array([ch.get_phase(current=current, verbose=verbose) for ch in self.channels])
+        return np.array([ch.get_phase(verbose=verbose) for ch in self.channels])
     
     def update_coeffs(self, plot: bool = False, verbose: bool = False):
         """
@@ -1246,6 +1234,122 @@ class Arch:
             channel.update_coeff(plot=plot, verbose=verbose)
         
         print(f"✅ Correction coefficients updated for {self.name} (channels {list(self.topas)}).")
+    
+    def calibrate_phase(self, samples: int, cred3_object, crop_centers, crop_sizes=10, plot: bool = False, verbose: bool = False):
+        """
+        Calibrate phase-to-power conversion coefficients for all channels in this chip.
+        
+        This method scans each channel individually from 0 to 1.2W, measures the output flux
+        using the provided Cred3 camera object, fits a sinusoid to the response, and
+        updates the PHASE_CONVERSION coefficient based on the measured period.
+        
+        Parameters
+        ----------
+        samples : int
+            Number of power steps for the scan.
+        cred3_object : Cred3
+            Instance of the Cred3 camera class.
+        crop_centers : list or ndarray
+            List of (x, y) coordinates for the output spots to monitor.
+        crop_sizes : int or tuple, optional
+            Size of the crop window. Default is 10.
+        plot : bool, optional
+            If True, plot the fitted curves. Default is False.
+        verbose : bool, optional
+            If True, print calibration details. Default is False.
+        """
+        
+        power_range = np.linspace(0, 1.2, samples)
+        
+        # Define the fitting function: A * sin(B * P + C) + D * P + E
+        def sine_func(x, A, B, C, D, E):
+            return A * np.sin(B * x + C) + D * x + E
+            
+        if verbose:
+            print(f"🔧 Calibrating phase for {len(self.channels)} channels...")
+            
+        for channel in self.channels:
+
+            # Turn off all channels first
+            self.turn_off(verbose=verbose)
+
+            if verbose:
+                print(f"  - Scanning channel {channel.channel}...")
+                
+            fluxes = []
+            
+            # Scan power
+            for p in power_range:
+                channel.set_power(p)
+                
+                # Get outputs
+                outs = cred3_object.get_outputs(crop_centers=crop_centers, crop_sizes=crop_sizes)
+                fluxes.append(outs)
+            
+            fluxes = np.array(fluxes) # Shape (n_samples, n_outputs)
+            
+            # Fit each output
+            periods = []
+            
+            if plot:
+                plt.figure(figsize=(10, 6))
+                plt.title(f"Channel {channel.channel} Calibration")
+                plt.xlabel("Power (W)")
+                plt.ylabel("Flux")
+            
+            n_outputs = fluxes.shape[1]
+            for i in range(n_outputs):
+                y_data = fluxes[:, i]
+                
+                # Initial guess
+                # A: (max-min)/2
+                # B: 2*pi / 0.6 (assuming ~0.6W period) -> ~10
+                # C: 0
+                # D: 0
+                # E: mean
+                p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data)]
+                
+                try:
+                    popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, maxfev=10000)
+                    
+                    A, B, C, D, E = popt
+                    period = 2 * np.pi / np.abs(B)
+                    periods.append(period)
+                    
+                    if plot:
+                        plt.plot(power_range, y_data, 'o', alpha=0.5, label=f'Out {i} Data')
+                        plt.plot(power_range, sine_func(power_range, *popt), '-', label=f'Out {i} Fit (T={period:.3f}W)')
+                        
+                except Exception as e:
+                    if verbose:
+                        print(f"    ⚠️ Fit failed for output {i}: {e}")
+            
+            if plot:
+                plt.legend()
+                plt.show()
+            
+            if periods:
+                # Filter outliers? Or just mean.
+                avg_period = np.mean(periods)
+                
+                # Update coefficient
+                # Period T corresponds to 2pi phase shift
+                # So Power = Phase * Coeff => T = 2pi * Coeff => Coeff = T / 2pi
+                new_coeff = avg_period / (2 * np.pi)
+                
+                _xpow.PHASE_CONVERSION[channel.channel - 1] = new_coeff
+                
+                if verbose:
+                    print(f"  ✅ Channel {channel.channel} calibrated: Period={avg_period:.4f} W -> Coeff={new_coeff:.4f} W/rad")
+            else:
+                if verbose:
+                    print(f"  ❌ Channel {channel.channel} calibration failed: no valid fits.")
+            
+            # Turn off channel before next
+            channel.turn_off()
+            
+        if verbose:
+            print("✅ Phase calibration completed.")
 
 # Backward compatibility aliases
 class XPOWController(XPOW):
