@@ -1268,7 +1268,19 @@ class Arch:
         if verbose:
             print(f"🔧 Calibrating phase for {len(self.channels)} channels...")
             
-        for channel in self.channels:
+        if plot:
+            # Calculate grid size for subplots based on number of channels
+            n_channels = len(self.channels)
+            cols = int(np.ceil(np.sqrt(n_channels)))
+            rows = int(np.ceil(n_channels / cols))
+            fig, axs = plt.subplots(rows, cols, figsize=(4*cols, 3*rows), constrained_layout=True)
+            fig.suptitle(f"Phase Calibration - {self.name}")
+            if n_channels > 1:
+                axs = np.atleast_1d(axs).flatten()
+            else:
+                axs = [axs]
+                
+        for idx, channel in enumerate(self.channels):
 
             # Turn off all channels first
             self.turn_off(verbose=verbose)
@@ -1291,13 +1303,15 @@ class Arch:
             # Fit each output
             periods = []
             
-            if plot:
-                plt.figure(figsize=(10, 6))
-                plt.title(f"Channel {channel.channel} Calibration")
-                plt.xlabel("Power (W)")
-                plt.ylabel("Flux")
-            
             n_outputs = fluxes.shape[1]
+            
+            if plot:
+                ax = axs[idx]
+                ax.set_title(f"Channel {channel.channel}")
+                ax.set_xlabel("Power (W)")
+                ax.set_ylabel("Flux")
+                ax.grid(True)
+            
             for i in range(n_outputs):
                 y_data = fluxes[:, i]
                 
@@ -1317,16 +1331,16 @@ class Arch:
                     periods.append(period)
                     
                     if plot:
-                        plt.plot(power_range, y_data, 'o', alpha=0.5, label=f'Out {i} Data')
-                        plt.plot(power_range, sine_func(power_range, *popt), '-', label=f'Out {i} Fit (T={period:.3f}W)')
+                        # Plot data points and fit
+                        line, = ax.plot(power_range, sine_func(power_range, *popt), '-', label=f'Out {i} (T={period:.3f}W)')
+                        ax.plot(power_range, y_data, 'o', color=line.get_color(), alpha=0.3)
                         
                 except Exception as e:
                     if verbose:
                         print(f"    ⚠️ Fit failed for output {i}: {e}")
             
             if plot:
-                plt.legend()
-                plt.show()
+                ax.legend(fontsize='small')
             
             if periods:
                 # Filter outliers? Or just mean.
@@ -1347,6 +1361,12 @@ class Arch:
             
             # Turn off channel before next
             channel.turn_off()
+            
+        if plot:
+            # Hide unused subplots
+            for j in range(len(self.channels), len(axs)):
+                axs[j].axis('off')
+            plt.show()
             
         if verbose:
             print("✅ Phase calibration completed.")
