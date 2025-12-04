@@ -57,10 +57,11 @@ class Cred3:
         self.cam.catch_up_with_sem(semid)
         
         # Initialize dark frame if needed
+        self.dark_shm_obj = None
         if use_dark:
             try:
-                dk = shm(dark_shm_path)
-                self.dark = dk.get_latest_data()
+                self.dark_shm_obj = shm(dark_shm_path)
+                self.dark = self.dark_shm_obj.get_latest_data()
                 mode_prefix = "⛱️ [SANDBOX] " if SANDBOX_MODE else ""
                 print(f"{mode_prefix}Cred3 camera initialized with dark subtraction")
             except Exception as e:
@@ -71,7 +72,7 @@ class Cred3:
             mode_prefix = "⛱️ [SANDBOX] " if SANDBOX_MODE else ""
             print(f"{mode_prefix}Cred3 camera initialized without dark subtraction")
     
-    def get_image(self, subtract_dark: bool = None) -> np.ndarray:
+    def get_image(self, subtract_dark: bool = True) -> np.ndarray:
         """
         Get the latest image from the shared memory.
         
@@ -79,7 +80,7 @@ class Cred3:
         ----------
         subtract_dark : bool, optional
             If True, subtract the dark frame. If None, uses the default
-            set during initialization. Default is None.
+            set during initialization. Default is True.
         
         Returns
         -------
@@ -98,23 +99,30 @@ class Cred3:
         if subtract_dark is None:
             subtract_dark = self.use_dark
         
-        if subtract_dark and self.dark is not None:
-            img = img - self.dark
+        if subtract_dark:
+            # Update dark frame if possible
+            if self.dark_shm_obj is not None:
+                try:
+                    self.dark = self.dark_shm_obj.get_latest_data()
+                except Exception:
+                    pass  # Keep using existing dark if update fails
+            
+            if self.dark is not None:
+                img = img - self.dark
         
         return img
     
-    def get_outputs(self, 
-                   crop_centers: np.ndarray = None,
-                   crop_sizes=10,
-                   subtract_dark: bool = None) -> np.ndarray:
+    def crop_outputs_from_image(self, 
+                               img: np.ndarray, 
+                               crop_centers: np.ndarray = None, 
+                               crop_sizes=10) -> np.ndarray:
         """
-        Get the mean intensity around specified output centers.
-        
-        This method crops regions around specified centers and returns
-        the mean flux in each region.
+        Crop regions around specified centers from an image and return integrated flux.
         
         Parameters
         ----------
+        img : ndarray
+            Input image to crop from.
         crop_centers : ndarray, optional
             Array of (x, y) coordinates for crop centers, shape (N, 2).
             Default centers correspond to the 4 main outputs:
@@ -123,40 +131,15 @@ class Cred3:
             Size of the crop window. If int, a square window of this size
             is used for all outputs. If tuple of length N, each output
             gets its own crop size. Default is 10 pixels.
-        subtract_dark : bool, optional
-            Whether to subtract dark frame. If None, uses initialization
-            default. Default is None.
-        
+            
         Returns
         -------
         flux : ndarray
-            Mean intensity in each cropped region, shape (N,).
-        
-        Examples
-        --------
-        >>> camera = Cred3()
-        >>> # Get outputs with default centers
-        >>> flux = camera.get_outputs()
-        >>> 
-        >>> # Custom centers and crop size
-        >>> centers = np.array([(100, 200), (300, 400)])
-        >>> flux = camera.get_outputs(crop_centers=centers, crop_sizes=20)
-        >>> 
-        >>> # Different crop sizes for each output
-        >>> flux = camera.get_outputs(crop_sizes=(10, 15, 10, 10))
+            Integrated flux (sum of pixel values) in each cropped region, shape (N,).
         """
-        # Default crop centers (4 main outputs)
-        if crop_centers is None:
-            crop_centers = np.array([(594, 114),
-                                    (499, 90),
-                                    (404, 66),
-                                    (309, 42)])
-        else:
-            crop_centers = np.array(crop_centers)
-        
-        # Get the latest image
-        img = self.get_image(subtract_dark=subtract_dark)
-        
+
+        img = np.transpose(img)  # Transpose to match (x, y) indexing
+            
         # Handle crop_sizes - convert to array
         n_outputs = crop_centers.shape[0]
         if isinstance(crop_sizes, (int, float)):
@@ -180,11 +163,63 @@ class Cred3:
             y1 = int(y_center - half_size)
             y2 = int(y_center + half_size + 1)
             
-            # Extract crop and compute mean
-            crop = img[x1:x2, y1:y2]
-            flux[i] = np.mean(crop)
+            # Extract crop and compute flux
+            # Handle boundary conditions to avoid errors if crop is outside image
+            try:
+                crop = img[x1:x2, y1:y2]
+                flux[i] = np.sum(crop)
+            except IndexError:
+                print(f"⚠️ Crop region {i} outside image boundaries")
+                flux[i] = 0.0
         
         return flux
+
+    def get_outputs(self, 
+                   crop_centers: np.ndarray = None,
+                   crop_sizes=10,
+                   subtract_dark: bool = True) -> np.ndarray:
+        """
+        Get the integrated flux around specified output centers.
+        
+        This method crops regions around specified centers and returns
+        the integrated flux (sum) in each region.
+        
+        Parameters
+        ----------
+        crop_centers : ndarray, optional
+            Array of (x, y) coordinates for crop centers, shape (N, 2).
+            Default centers correspond to the 4 main outputs:
+            [(594, 114), (499, 90), (404, 66), (309, 42)]
+        crop_sizes : int or tuple, optional
+            Size of the crop window. If int, a square window of this size
+            is used for all outputs. If tuple of length N, each output
+            gets its own crop size. Default is 10 pixels.
+        subtract_dark : bool, optional
+            Whether to subtract dark frame. If None, uses initialization
+            default. Default is True.
+        
+        Returns
+        -------
+        flux : ndarray
+            Integrated flux in each cropped region, shape (N,).
+        
+        Examples
+        --------
+        >>> camera = Cred3()
+        >>> # Get outputs with default centers
+        >>> flux = camera.get_outputs()
+        >>> 
+        >>> # Custom centers and crop size
+        >>> centers = np.array([(100, 200), (300, 400)])
+        >>> flux = camera.get_outputs(crop_centers=centers, crop_sizes=20)
+        >>> 
+        >>> # Different crop sizes for each output
+        >>> flux = camera.get_outputs(crop_sizes=(10, 15, 10, 10))
+        """
+        # Get the latest image
+        img = self.get_image(subtract_dark=subtract_dark)
+        
+        return self.crop_outputs_from_image(img, crop_centers=crop_centers, crop_sizes=crop_sizes)
     
     def update_dark(self, dark_shm_path: str = None):
         """
