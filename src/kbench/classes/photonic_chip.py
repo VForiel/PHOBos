@@ -1261,9 +1261,9 @@ class Arch:
         
         power_range = np.linspace(0, 1.2, samples)
         
-        # Define the fitting function: A * sin(B * P + C) + D * P + E
-        def sine_func(x, A, B, C, D, E):
-            return A * np.sin(B * x + C) + D * x + E
+        # Define the fitting function: (A + F*P) * sin(B * P + C) + D * P + E
+        def sine_func(x, A, B, C, D, E, F):
+            return (A + F * x) * np.sin(B * x + C) + D * x + E
             
         if verbose:
             print(f"🔧 Calibrating phase for {len(self.channels)} channels...")
@@ -1300,6 +1300,11 @@ class Arch:
             
             fluxes = np.array(fluxes) # Shape (n_samples, n_outputs)
             
+            # Calculate amplitudes to filter out unaffected outputs
+            amplitudes = np.ptp(fluxes, axis=0)
+            max_amp = np.max(amplitudes) if len(amplitudes) > 0 else 0
+            threshold = max_amp / 10.0
+            
             # Fit each output
             periods = []
             
@@ -1313,6 +1318,10 @@ class Arch:
                 ax.grid(True)
             
             for i in range(n_outputs):
+                if amplitudes[i] < threshold:
+                    # Skip outputs that are not affected by this shifter
+                    continue
+
                 y_data = fluxes[:, i]
                 
                 # Initial guess
@@ -1321,12 +1330,13 @@ class Arch:
                 # C: 0
                 # D: 0
                 # E: mean
-                p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data)]
+                # F: 0
+                p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data), 0]
                 
                 try:
                     popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, maxfev=10000)
                     
-                    A, B, C, D, E = popt
+                    A, B, C, D, E, F = popt
                     period = 2 * np.pi / np.abs(B)
                     periods.append(period)
                     
