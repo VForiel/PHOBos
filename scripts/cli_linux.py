@@ -59,6 +59,12 @@ def main():
         control_filter(sys.argv[2:])
         sys.exit(0)
 
+    # Point Grey camera -------------------------------------------------------
+
+    if sys.argv[1] in ['pointgrey', 'pg']:
+        control_pointgrey(sys.argv[2:])
+        sys.exit(0)
+
     # Invalid equipment -------------------------------------------------------
 
     print(f"❌ Error: Invalid equipment '{sys.argv[1]}'.")
@@ -78,6 +84,7 @@ def show_help():
     print("\n🔧 Available Equipment:")
     print("  mask     Control pupil mask (rotation + positioning)")
     print("  filter   Control filter wheel (slot selection)")
+    print("  pointgrey  Point Grey camera utilities (reset)")
     print("  config   Manage configuration files and settings")
     
     print("\n⚙️  Global Options:")
@@ -863,6 +870,48 @@ def control_filter(args):
     # Invalid args ------------------------------------------------------------
     print(f"❌ Error: Invalid filter command.")
     print("ℹ️ Use 'kbch filter --help' for usage information.")
+    sys.exit(1)
+
+#==============================================================================
+# Point Grey camera utilities
+#==============================================================================
+
+def control_pointgrey(args):
+
+    def show_help():
+        print("📷 POINT GREY - Camera Utilities")
+        print("="*45)
+        print("Usage: kbch pointgrey reset")
+        print("       kbch pg reset")
+        print("\n🎯 Commands:")
+        print("  reset         Soft reset the USB connection (unbind/bind)")
+        print("\n💡 Notes:")
+        print("  - Requires sudo for USB unbind/bind operations")
+        print("  - Automatically detects the Point Grey device (Vendor ID 1e10)")
+
+    if len(args) < 1 or args[0] in ['--help', '-h']:
+        show_help()
+        sys.exit(0)
+
+    if args[0] in ['reset']:
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), 'reset_camera.sh')
+        if not os.path.isfile(script_path):
+            print("❌ Error: reset script not found.")
+            print(f"ℹ️ Expected at: {script_path}")
+            sys.exit(1)
+        print("⌛ Resetting Point Grey camera (USB)…")
+        try:
+            # Run with sudo; user may be prompted for password
+            subprocess.check_call(['sudo', script_path])
+            print("✅ Done")
+            sys.exit(0)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error: reset failed (exit code {e.returncode}).")
+            sys.exit(e.returncode)
+
+    print("❌ Error: Invalid pointgrey command.")
+    print("ℹ️ Use 'kbch pointgrey --help' for usage information.")
     sys.exit(1)
 
 #==============================================================================
