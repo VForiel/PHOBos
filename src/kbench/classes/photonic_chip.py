@@ -495,7 +495,12 @@ class PhaseShifter:
         # Compute slope coefficient
         # (the slope is coming from a potential difference between what is set and what is measured)
         # P = slope * V * I  (with I in amperes)
-        slope = (i2 - i1) / (v2 - v1)
+        if abs(v2 - v1) < 0.01:  # Voltage difference too small
+            if verbose:
+                print(f"⚠️  Channel {self.channel}: voltage unchanged (v1={v1:.2f}V, v2={v2:.2f}V). Using default slope=1.0. Please ensure the XPOW is correctly powered. If so, try to restart it.")
+            slope = 1.0
+        else:
+            slope = (i2 - i1) / (v2 - v1)
         
         # Store the slope coefficient
         _xpow.POWER_CORRECTION[self.channel - 1] = slope
@@ -1417,19 +1422,20 @@ class Arch:
         Returns
         -------
         str
-            Path to the saved archive directory.
+            Path to the consolidated characterization_data.npz archive file.
             
         Notes
         -----
         Results are saved to:
-        generated/architecture_characterization/<arch_name>/<datetime>/
+        generated/architecture_characterization/<arch_name>/<datetime>/characterization_data.npz
         
-        The archive contains .npz files with:
-        - phases: array of phase values
-        - fluxes: measured output fluxes
-        - inputs: which inputs were active
-        - shifter: which shifter was scanned
-        - metadata: scan parameters
+        The archive is a single .npz file containing all scans with structured keys:
+        - metadata_*: global parameters (arch_name, timestamp, etc.)
+        - n{n}_inputs_{i1}_{i2}_shifter{ch}_*: scan data for each configuration
+          - phases: array of phase values
+          - fluxes: measured output fluxes
+          - active_inputs: which inputs were active
+          - shifter_channel: which shifter was scanned
         """
         if verbose:
             print(f"🔬 Starting full characterization of {self.name}...")
@@ -1468,6 +1474,9 @@ class Arch:
         
         total_scans = len(input_combinations) * len(self.channels)
         scan_count = 0
+        
+        # Dictionary to store all scan data
+        all_scans = {}
         
         # Scan each input combination
         for active_inputs, combo_label in input_combinations:
@@ -1508,144 +1517,257 @@ class Arch:
                 
                 fluxes = np.array(fluxes)  # Shape: (phase_samples, n_outputs)
                 
-                # Save this scan
-                filename = f"{combo_label}_shifter{shifter.channel}.npz"
-                filepath = os.path.join(base_dir, filename)
+                # Fit each output with the sinusoidal model
+                # Model: (A + F*x) * sin(B * x + C) + D * x + E
+                def sine_func(x, A, B, C, D, E, F):
+                    return (A + F * x) * np.sin(B * x + C) + D * x + E
                 
-                np.savez(filepath,
-                        phases=phase_range,
-                        fluxes=fluxes,
-                        active_inputs=np.array(active_inputs),
-                        shifter_channel=shifter.channel,
-                        shifter_index=shifter_idx,
-                        n_inputs_active=n_active,
-                        n_outputs=self.n_outputs,
-                        crop_centers=crop_centers,
-                        crop_sizes=crop_sizes,
-                        n_averages=n_averages,
-                        timestamp=timestamp,
-                        arch_name=self.name,
-                        arch_number=self.number)
+                n_outputs = fluxes.shape[1]
+                fit_params = np.zeros((n_outputs, 6))  # 6 parameters per output
+                fit_success = np.zeros(n_outputs, dtype=bool)
+                
+                for out_idx in range(n_outputs):
+                    try:
+                        # Initial guess for parameters
+                        flux_mean = np.mean(fluxes[:, out_idx])
+                        flux_amp = (np.max(fluxes[:, out_idx]) - np.min(fluxes[:, out_idx])) / 2
+                        
+                        p0 = [flux_amp, 1.0, 0.0, 0.0, flux_mean, 0.0]  # [A, B, C, D, E, F]
+                        
+                        # Fit
+                        popt, _ = curve_fit(sine_func, phase_range, fluxes[:, out_idx], 
+                                           p0=p0, maxfev=5000)
+                        fit_params[out_idx] = popt
+                        fit_success[out_idx] = True
+                    except:
+                        # If fit fails, store zeros
+                        fit_params[out_idx] = np.zeros(6)
+                        fit_success[out_idx] = False
+                
+                # Store scan in dictionary with unique key
+                scan_key = f"n{n_active:d}_inputs_{'_'.join(map(str, active_inputs))}_shifter{shifter.channel:02d}"
+                all_scans[scan_key] = {
+                    'phases': phase_range,
+                    'fluxes': fluxes,
+                    'active_inputs': np.array(active_inputs),
+                    'shifter_channel': shifter.channel,
+                    'shifter_index': shifter_idx,
+                    'n_inputs_active': n_active,
+                    'fit_params': fit_params,
+                    'fit_success': fit_success
+                }
                 
                 if verbose:
-                    print(f"     ✅ Saved: {filename}")
+                    n_successful = np.sum(fit_success)
+                    print(f"     ✅ Scan stored: {scan_key} (fits: {n_successful}/{n_outputs})")
         
         # Turn everything off at the end
         self.turn_off(verbose=False)
         dm_object.max()  # Restore all inputs
         
+        # Save consolidated archive
+        archive_file = os.path.join(base_dir, "characterization_data.npz")
+        
+        # Prepare data for saving: flatten nested dict structure
+        save_dict = {
+            # Global metadata
+            'metadata_n_outputs': self.n_outputs,
+            'metadata_crop_centers': crop_centers,
+            'metadata_crop_sizes': crop_sizes,
+            'metadata_n_averages': n_averages,
+            'metadata_timestamp': timestamp,
+            'metadata_arch_name': self.name,
+            'metadata_arch_number': self.number,
+            'metadata_scan_keys': list(all_scans.keys())  # Index of all scans
+        }
+        
+        # Add each scan's data with prefixed keys
+        for scan_key, scan_data in all_scans.items():
+            for data_key, data_value in scan_data.items():
+                save_dict[f"{scan_key}_{data_key}"] = data_value
+        
+        np.savez(archive_file, **save_dict)
+        
         if verbose:
             print(f"\n✅ Characterization complete!")
             print(f"   Total scans: {scan_count}")
-            print(f"   Data saved to: {base_dir}")
+            print(f"   Consolidated archive: {archive_file}")
         
         # Automatically plot results if requested
         if plot:
             if verbose:
                 print(f"\n📊 Generating plots...")
-            self.plot_characterization(base_dir)
+            self.plot_characterization(archive_file)
         
-        return base_dir
+        return archive_file
 
     @staticmethod
     def plot_characterization(archive_path, output_dir=None):
         """
-        Load and plot characterization results from an archive directory.
+        Load and plot characterization results from a consolidated archive.
         
-        Creates separate plots for each input count (1, 2, 3, 4 inputs) showing
-        all shifter responses.
+        Creates separate plots for each number of inputs (1, 2, 3, 4), with:
+        - Rows: different shifters
+        - Columns: different input combinations for that input count
+        - Each subplot shows fitted sinusoidal responses for all outputs
         
         Parameters
         ----------
         archive_path : str
-            Path to the characterization archive directory.
+            Path to the consolidated characterization_data.npz file.
         output_dir : str, optional
-            Directory to save plots. If None, uses archive_path. Default is None.
+            Directory to save plots. If None, uses the parent directory of archive_path.
             
         Returns
         -------
         dict
-            Dictionary mapping n_inputs -> list of figure objects.
+            Dictionary mapping n_inputs -> figure object.
             
         Examples
         --------
         >>> arch = Arch(6)
         >>> # ... run characterization ...
-        >>> Arch.plot_characterization("generated/architecture_characterization/...")
+        >>> Arch.plot_characterization("generated/.../characterization_data.npz")
         """
         if output_dir is None:
-            output_dir = archive_path
+            output_dir = os.path.dirname(archive_path)
         
-        # Find all .npz files
-        npz_files = [f for f in os.listdir(archive_path) if f.endswith('.npz')]
-        
-        if not npz_files:
-            print(f"❌ No .npz files found in {archive_path}")
+        # Load consolidated archive
+        if not os.path.exists(archive_path):
+            print(f"❌ Archive not found: {archive_path}")
             return {}
         
-        # Group files by number of active inputs
-        grouped_data = {1: [], 2: [], 3: [], 4: []}
+        data = np.load(archive_path)
         
-        for npz_file in npz_files:
-            filepath = os.path.join(archive_path, npz_file)
-            data = np.load(filepath)
-            n_inputs = int(data['n_inputs_active'])
-            grouped_data[n_inputs].append((npz_file, data))
+        # Extract metadata
+        scan_keys = data['metadata_scan_keys']
+        arch_name = str(data['metadata_arch_name'])
+        timestamp = str(data['metadata_timestamp'])
         
+        # Fitting function
+        def sine_func(x, A, B, C, D, E, F):
+            return (A + F * x) * np.sin(B * x + C) + D * x + E
+        
+        # Organize scans by: n_inputs -> shifter_ch -> [list of scans with different input combos]
+        # First, collect all data
+        scan_structure = {}
+        shifter_channels = set()
+        
+        for scan_key in scan_keys:
+            shifter_ch = int(data[f"{scan_key}_shifter_channel"])
+            n_inputs = int(data[f"{scan_key}_n_inputs_active"])
+            active_inputs = tuple(data[f"{scan_key}_active_inputs"])
+            
+            shifter_channels.add(shifter_ch)
+            
+            if n_inputs not in scan_structure:
+                scan_structure[n_inputs] = {}
+            
+            if shifter_ch not in scan_structure[n_inputs]:
+                scan_structure[n_inputs][shifter_ch] = []
+            
+            scan_data = {
+                'key': scan_key,
+                'phases': data[f"{scan_key}_phases"],
+                'fluxes': data[f"{scan_key}_fluxes"],
+                'active_inputs': active_inputs,
+                'shifter_channel': shifter_ch,
+                'fit_params': data[f"{scan_key}_fit_params"],
+                'fit_success': data[f"{scan_key}_fit_success"]
+            }
+            
+            scan_structure[n_inputs][shifter_ch].append(scan_data)
+        
+        shifter_channels = sorted(list(shifter_channels))
         figures = {}
         
-        # Plot each input count group
-        for n_inputs in sorted(grouped_data.keys()):
-            if not grouped_data[n_inputs]:
-                continue
+        # Create one figure per number of inputs
+        for n_inputs in sorted(scan_structure.keys()):
+            print(f"📊 Plotting {n_inputs}-input configuration(s)...")
             
-            print(f"📊 Plotting {n_inputs}-input scans...")
+            # Get all input combinations for this n_inputs
+            # (number of columns = number of different combinations)
+            input_combos = set()
+            for shifter_ch in shifter_channels:
+                if shifter_ch in scan_structure[n_inputs]:
+                    for scan in scan_structure[n_inputs][shifter_ch]:
+                        input_combos.add(scan['active_inputs'])
             
-            # Determine grid size
-            n_scans = len(grouped_data[n_inputs])
-            cols = min(4, n_scans)
-            rows = int(np.ceil(n_scans / cols))
+            input_combos = sorted(list(input_combos))
+            n_cols = len(input_combos)
+            n_rows = len(shifter_channels)
             
-            fig, axs = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), 
+            # Create figure
+            fig, axs = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows), 
                                    constrained_layout=True)
-            
-            # Get architecture name from first file
-            arch_name = grouped_data[n_inputs][0][1]['arch_name']
-            timestamp = str(grouped_data[n_inputs][0][1]['timestamp'])
             
             fig.suptitle(f"{arch_name} - {n_inputs} Input(s) Active\n{timestamp}", 
                         fontsize=14, fontweight='bold')
             
-            if n_scans == 1:
-                axs = [axs]
-            elif rows == 1:
-                axs = axs
-            else:
-                axs = axs.flatten()
+            # Ensure axs is 2D array
+            if n_rows == 1 and n_cols == 1:
+                axs = np.array([[axs]])
+            elif n_rows == 1:
+                axs = axs.reshape(1, -1)
+            elif n_cols == 1:
+                axs = axs.reshape(-1, 1)
             
-            for idx, (filename, data) in enumerate(grouped_data[n_inputs]):
-                ax = axs[idx]
-                
-                phases = data['phases']
-                fluxes = data['fluxes']
-                active_inputs = data['active_inputs']
-                shifter_ch = int(data['shifter_channel'])
-                n_outputs = int(data['n_outputs'])
-                
-                # Plot each output
-                for out_idx in range(fluxes.shape[1]):
-                    ax.plot(phases / np.pi, fluxes[:, out_idx], '-o', 
-                           markersize=3, label=f'Out {out_idx+1}', alpha=0.7)
-                
-                ax.set_xlabel("Phase (π rad)")
-                ax.set_ylabel("Flux (ADU)")
-                ax.set_title(f"Shifter {shifter_ch}\nInputs: {list(active_inputs)}")
-                ax.grid(True, alpha=0.3)
-                ax.legend(fontsize='small', ncol=2)
-            
-            # Hide unused subplots
-            for j in range(n_scans, len(axs)):
-                axs[j].axis('off')
+            # Plot each cell: row = shifter, col = input combination
+            for row_idx, shifter_ch in enumerate(shifter_channels):
+                for col_idx, input_combo in enumerate(input_combos):
+                    ax = axs[row_idx, col_idx]
+                    
+                    # Find the scan for this shifter and input combination
+                    scan_data = None
+                    if shifter_ch in scan_structure[n_inputs]:
+                        for scan in scan_structure[n_inputs][shifter_ch]:
+                            if scan['active_inputs'] == input_combo:
+                                scan_data = scan
+                                break
+                    
+                    if scan_data is None:
+                        ax.text(0.5, 0.5, 'No data', ha='center', va='center', 
+                               transform=ax.transAxes)
+                        ax.set_title(f"Shifter {shifter_ch}\nInputs: {list(input_combo)}")
+                        ax.axis('off')
+                        continue
+                    
+                    # Extract data
+                    phases = scan_data['phases']
+                    fluxes = scan_data['fluxes']
+                    active_inputs = scan_data['active_inputs']
+                    fit_params = scan_data['fit_params']
+                    fit_success = scan_data['fit_success']
+                    n_outputs = fluxes.shape[1]
+                    
+                    # Dense phase array for smooth fit curves
+                    phase_dense = np.linspace(0, 2*np.pi, 200)
+                    
+                    # Plot each output
+                    for out_idx in range(n_outputs):
+                        # Plot data points
+                        ax.plot(phases / np.pi, fluxes[:, out_idx], 'o', 
+                               markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
+                        
+                        # Plot fit if successful
+                        if fit_success[out_idx]:
+                            fit_curve = sine_func(phase_dense, *fit_params[out_idx])
+                            ax.plot(phase_dense / np.pi, fit_curve, '-', 
+                                   linewidth=1.5, alpha=0.8)
+                    
+                    # Labels and title
+                    ax.set_xlabel("Phase (π rad)", fontsize=9)
+                    if col_idx == 0:
+                        ax.set_ylabel("Flux (ADU)", fontsize=9)
+                    
+                    # Title with shifter and inputs info
+                    inputs_str = ','.join(map(str, active_inputs))
+                    ax.set_title(f"Shifter {shifter_ch}\nInputs: [{inputs_str}]", 
+                                fontsize=10)
+                    
+                    ax.grid(True, alpha=0.3)
+                    if n_outputs <= 4:  # Only show legend if not too many outputs
+                        ax.legend(fontsize='x-small', ncol=2, loc='best')
             
             # Save figure
             fig_filename = f"characterization_{n_inputs}inputs.png"
