@@ -2,9 +2,153 @@
 
 This guide provides installation and setup instructions for the PHOTONICS bench laboratory computer.
 
-## Camera
+## Camera (C-Red 3)
 
-Camera setup documentation to be added.
+### Driver for the EDT PCI Board
+
+The C-Red 3 camera communicates through an EDT PCI board that must be properly configured.
+
+### Dependencies
+
+Install the required libraries:
+
+- **EDT PDV SDK**: Available from `/opt/EDTpdv/`
+- **libImageStreamIO**: For shared memory image streaming
+- **commander**: Camera control interface
+
+### Starting the C-Red 1 Server
+
+After a reboot, the PCI board must be reconfigured to recognize the camera type:
+
+```bash
+cd ~/Progs/repos/dcs/asgard-cred1-server
+/opt/EDTpdv/initcam -f cred3_edt_config.cfg
+```
+
+Start the C-Red 1 server:
+
+```bash
+cd ~/Progs/repos/dcs/asgard-cred1-server
+./asgard_cam_server
+```
+
+### Camera Control Commands
+
+#### Grab Frames
+
+In the C-Red 1 server prompt:
+
+```bash
+fetch
+```
+
+#### View Images with shmview
+
+In the "photonic" Python environment:
+
+```bash
+shmview
+```
+
+- Navigate to **File > Open SHM**
+- Select `cred1.im.shm`
+- The camera image should appear
+
+#### Stop Grabbing
+
+```bash
+stop
+```
+
+#### Get Camera Status
+
+```bash
+status
+```
+
+Returns `idle` if not running, `running` otherwise.
+
+#### Get Framerate
+
+```bash
+cli "fps"
+```
+
+Returns the frame rate in Hz.
+
+#### Set Framerate
+
+```bash
+cli "set fps XXX"
+```
+
+Replace `XXX` with the desired frame rate in Hz.
+
+#### Other Commands
+
+Check the C-Red 3 documentation for available commands, then use:
+
+```bash
+cli "your_command"
+```
+
+### Troubleshooting Camera Issues
+
+#### Camera Information Shows Zeros
+
+If the server displays frame size, timeout, or FPS as 0, restart the PCI board:
+
+```bash
+cd ~/Progs/repos/dcs/asgard-cred1-server
+/opt/EDTpdv/initcam -f cred3_edt_config.cfg
+```
+
+#### Segmentation Fault on "fetch" Command
+
+Restart the PCI board using the same command as above.
+
+#### Segmentation Fault on Server Start
+
+Swap the cables behind the camera, then reinitialize:
+
+```bash
+cd ~/Progs/repos/dcs/asgard-cred1-server
+/opt/EDTpdv/initcam -f cred3_edt_config.cfg
+./asgard_cam_server
+```
+
+## USB Device Assignment
+
+To ensure USB devices are assigned to consistent ttyUSB ports for kbench:
+
+Create the udev rules file:
+
+```bash
+sudo nano /etc/udev/rules.d/99-usbserial.rules
+```
+
+Add the following rules:
+
+```bash
+ACTION=="add",ENV{ID_BUS}=="usb",ENV{ID_SERIAL_SHORT}=="AC01ZP6W",SYMLINK+="ttyUSBzaber"
+ACTION=="add",ENV{ID_BUS}=="usb",ENV{ID_SERIAL_SHORT}=="TP02052235-13923",SYMLINK+="ttyUSBthorlabs"
+ACTION=="add",ENV{ID_BUS}=="usb",ENV{ID_SERIAL_SHORT}=="A64MV77S",SYMLINK+="ttyUSBnewport"
+```
+
+Apply the rules:
+
+```bash
+sudo udevadm control --reload-rules
+```
+
+Or reboot the computer.
+
+**Device mappings:**
+- `ttyUSBzaber`: Zaber linear stages
+- `ttyUSBthorlabs`: Thorlabs filter wheel
+- `ttyUSBnewport`: Newport mask wheel
+
+kbench reads these device IDs from the `config.yml` file.
 
 ## Deformable Mirror (BMC)
 

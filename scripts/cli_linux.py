@@ -65,6 +65,12 @@ def main():
         control_pointgrey(sys.argv[2:])
         sys.exit(0)
 
+    # C-Red 3 camera ----------------------------------------------------------
+
+    if sys.argv[1] in ['cred3']:
+        control_cred3(sys.argv[2:])
+        sys.exit(0)
+
     # Invalid equipment -------------------------------------------------------
 
     print(f"❌ Error: Invalid equipment '{sys.argv[1]}'.")
@@ -85,6 +91,7 @@ def show_help():
     print("  mask     Control pupil mask (rotation + positioning)")
     print("  filter   Control filter wheel (slot selection)")
     print("  pointgrey  Point Grey camera utilities (reset)")
+    print("  cred3    C-Red 3 camera utilities (take dark frames)")
     print("  config   Manage configuration files and settings")
     
     print("\n⚙️  Global Options:")
@@ -912,6 +919,64 @@ def control_pointgrey(args):
 
     print("❌ Error: Invalid pointgrey command.")
     print("ℹ️ Use 'kbch pointgrey --help' for usage information.")
+    sys.exit(1)
+
+#==============================================================================
+# C-Red 3 camera utilities
+#==============================================================================
+
+def control_cred3(args):
+
+    def show_help():
+        print("📷 C-RED 3 CAMERA - Utilities")
+        print("="*45)
+        print("Usage: kbch cred3 takedark [-n NB_FRAMES]")
+        print("\n🎯 Commands:")
+        print("  takedark         Acquire dark frames and save to FITS file")
+        print("\n⚙️  Options:")
+        print("  -n, --nframes    Number of frames to acquire (default: 100)")
+        print("\n💡 Examples:")
+        print("  kbch cred3 takedark           # Take 100 dark frames")
+        print("  kbch cred3 takedark -n 50     # Take 50 dark frames")
+
+    if len(args) < 1 or args[0] in ['--help', '-h']:
+        show_help()
+        sys.exit(0)
+
+    if args[0] in ['takedark']:
+        # Parse number of frames
+        nb_frames = 1000  # Default value
+        if len(args) > 1:
+            if args[1] in ['-n', '--nframes']:
+                if len(args) < 3:
+                    print("❌ Error: -n option requires a frame count.")
+                    sys.exit(1)
+                try:
+                    nb_frames = int(args[2])
+                    if nb_frames <= 0:
+                        print("❌ Error: Frame count must be positive.")
+                        sys.exit(1)
+                except ValueError:
+                    print("❌ Error: Invalid frame count (must be an integer).")
+                    sys.exit(1)
+            else:
+                print(f"❌ Error: Unknown option '{args[1]}'.")
+                print("ℹ️ Use 'kbch cred3 --help' for usage information.")
+                sys.exit(1)
+
+        print(f"⌛ Acquiring {nb_frames} dark frames from C-Red 3 camera...")
+        
+        try:
+            cam = kbench.Cred3()
+            cam.take_darks(nb_frames)
+            print("✅ Done - dark frames saved")
+            sys.exit(0)
+        except Exception as e:
+            print(f"❌ Error: Failed to acquire dark frames: {e}")
+            sys.exit(1)
+
+    print("❌ Error: Invalid cred3 command.")
+    print("ℹ️ Use 'kbch cred3 --help' for usage information.")
     sys.exit(1)
 
 #==============================================================================

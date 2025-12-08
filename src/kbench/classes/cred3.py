@@ -117,7 +117,7 @@ class Cred3:
                                crop_centers: np.ndarray = None, 
                                crop_sizes=10) -> np.ndarray:
         """
-        Crop regions around specified centers from an image and return integrated flux.
+        Crop regions around specified centers from an image and return averaged flux.
         
         Parameters
         ----------
@@ -167,7 +167,7 @@ class Cred3:
             # Handle boundary conditions to avoid errors if crop is outside image
             try:
                 crop = img[x1:x2, y1:y2]
-                flux[i] = np.sum(crop)
+                flux[i] = np.mean(crop)
             except IndexError:
                 print(f"⚠️ Crop region {i} outside image boundaries")
                 flux[i] = 0.0
@@ -179,7 +179,7 @@ class Cred3:
                    crop_sizes=10,
                    subtract_dark: bool = True) -> np.ndarray:
         """
-        Get the integrated flux around specified output centers.
+        Get the averaged flux around specified output centers.
         
         This method crops regions around specified centers and returns
         the integrated flux (sum) in each region.
@@ -246,6 +246,101 @@ class Cred3:
             print(f"Dark frame updated from {dark_shm_path}")
         except Exception as e:
             print(f"⚠️ Could not update dark frame: {e}")
+    
+    def take_darks(self, nb_frames: int = 1000, save_to_shm: bool = True) -> np.ndarray:
+        """
+        Acquire dark frames and compute the average.
+        
+        This method acquires a specified number of frames, computes their average,
+        and optionally saves the result to shared memory for use as a dark frame.
+        
+        Parameters
+        ----------
+        nb_frames : int, optional
+            Number of frames to acquire and average. Default is 1000.
+        save_to_shm : bool, optional
+            If True, save the averaged dark frame to shared memory at
+            self.dark_shm_path. Default is True.
+        
+        Returns
+        -------
+        dark_mean : ndarray
+            The averaged dark frame.
+        
+        Notes
+        -----
+        - Ensure the camera source is turned OFF before acquiring darks
+        - The method checks for late frames (when semaphore value > 0)
+        - The dark frame is automatically loaded if save_to_shm is True
+        
+        Examples
+        --------
+        >>> camera = Cred3()
+        >>> # Acquire 100 dark frames (default)
+        >>> dark = camera.take_darks()
+        >>> 
+        >>> # Acquire 50 frames without saving to shared memory
+        >>> dark = camera.take_darks(nb_frames=50, save_to_shm=False)
+        """
+        try:
+            from tqdm import tqdm
+            use_tqdm = True
+        except ImportError:
+            use_tqdm = False
+            print("⚠️ tqdm not available, progress bar disabled")
+        
+        if SANDBOX_MODE:
+            print(f"⛱️ [SANDBOX] Simulating acquisition of {nb_frames} dark frames")
+            # In sandbox mode, generate random dark frames
+            import time
+            time.sleep(0.5)  # Simulate acquisition time
+            dark_mean = np.random.randint(0, 100, size=(320, 256), dtype=np.uint16)
+            print(f"⛱️ [SANDBOX] Dark acquisition complete")
+            return dark_mean
+        
+        images = []
+        log_sem = []
+        
+        print(f"Taking {nb_frames} dark frames...")
+        
+        # Catch up with semaphore before starting
+        self.cam.catch_up_with_sem(self.semid)
+        
+        # Acquire frames
+        iterator = tqdm(range(nb_frames)) if use_tqdm else range(nb_frames)
+        for ii in iterator:
+            img = self.cam.get_latest_data(self.semid)
+            images.append(img)
+            semval = self.cam.sems[self.semid].value
+            log_sem.append(semval)
+        
+        images = np.array(images)
+        print('Acquisition complete')
+        
+        # Check for late frames
+        log_sem = np.array(log_sem)
+        if np.any(log_sem > 0):
+            mask = np.where(log_sem > 0)[0]
+            print(f'⚠️ Total late frames: {len(mask)}')
+        
+        # Compute average dark
+        dark_mean = images.mean(axis=0)
+        
+        # Save to shared memory if requested
+        if save_to_shm:
+            print(f'Saving dark frame to {self.dark_shm_path}...')
+            try:
+                dark_shm_obj = shm(self.dark_shm_path, data=dark_mean)
+                print('✅ Dark frame saved to shared memory')
+                
+                # Update the internal dark frame
+                self.dark = dark_mean
+                self.dark_shm_obj = dark_shm_obj
+                self.use_dark = True
+            except Exception as e:
+                print(f"⚠️ Could not save dark to shared memory: {e}")
+        
+        return dark_mean
     
     def close(self):
         """
