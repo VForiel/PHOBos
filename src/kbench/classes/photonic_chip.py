@@ -6,6 +6,9 @@ from scipy.optimize import curve_fit
 from .. import SANDBOX_MODE
 import re
 import warnings
+from datetime import datetime
+import os
+from itertools import combinations
 
 
 class XPOW:
@@ -1378,6 +1381,282 @@ class Arch:
             
         if verbose:
             print("✅ Phase calibration completed.")
+
+    def characterize(self, dm_object, cred3_object, crop_centers, crop_sizes=10, 
+                    phase_samples=51, n_averages=10, plot=True, verbose=True):
+        """
+        Comprehensive characterization of the architecture with all input/shifter combinations.
+        
+        This method systematically scans phase responses for:
+        - Each single input (1-4)
+        - Each pair of inputs (1-2, 1-3, 1-4, 2-3, 2-4, 3-4)
+        - Each trio of inputs
+        - All 4 inputs simultaneously
+        
+        For each input configuration, all shifters are scanned from 0 to 2π.
+        
+        Parameters
+        ----------
+        dm_object : DM
+            Deformable mirror instance to control input blocking/unblocking.
+        cred3_object : Cred3
+            Camera instance for flux measurements.
+        crop_centers : array-like
+            Output spot centers for flux extraction.
+        crop_sizes : int, optional
+            Crop window size. Default is 10.
+        phase_samples : int, optional
+            Number of phase steps (0 to 2π). Default is 51.
+        n_averages : int, optional
+            Number of frames to average per phase point. Default is 10.
+        plot : bool, optional
+            If True, automatically generate plots after characterization. Default is True.
+        verbose : bool, optional
+            Print progress information. Default is True.
+            
+        Returns
+        -------
+        str
+            Path to the saved archive directory.
+            
+        Notes
+        -----
+        Results are saved to:
+        generated/architecture_characterization/<arch_name>/<datetime>/
+        
+        The archive contains .npz files with:
+        - phases: array of phase values
+        - fluxes: measured output fluxes
+        - inputs: which inputs were active
+        - shifter: which shifter was scanned
+        - metadata: scan parameters
+        """
+        if verbose:
+            print(f"🔬 Starting full characterization of {self.name}...")
+            print(f"   Inputs: {self.n_inputs}, Outputs: {self.n_outputs}, Shifters: {len(self.channels)}")
+        
+        # Create output directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_dir = os.path.join("generated", "architecture_characterization", 
+                               self.name.replace(" ", "_"), timestamp)
+        os.makedirs(base_dir, exist_ok=True)
+        
+        if verbose:
+            print(f"   Save directory: {base_dir}")
+        
+        # Phase scan range
+        phase_range = np.linspace(0, 2*np.pi, phase_samples)
+        
+        # Generate all input combinations
+        all_inputs = list(range(1, self.n_inputs + 1))
+        input_combinations = []
+        
+        # 1-input: [1], [2], [3], [4]
+        for i in all_inputs:
+            input_combinations.append(([i], f"input_{i}"))
+        
+        # 2-inputs: [1,2], [1,3], etc.
+        for combo in combinations(all_inputs, 2):
+            input_combinations.append((list(combo), f"inputs_{'_'.join(map(str, combo))}"))
+        
+        # 3-inputs
+        for combo in combinations(all_inputs, 3):
+            input_combinations.append((list(combo), f"inputs_{'_'.join(map(str, combo))}"))
+        
+        # 4-inputs (all)
+        input_combinations.append((all_inputs, "inputs_all"))
+        
+        total_scans = len(input_combinations) * len(self.channels)
+        scan_count = 0
+        
+        # Scan each input combination
+        for active_inputs, combo_label in input_combinations:
+            n_active = len(active_inputs)
+            
+            if verbose:
+                print(f"\n📊 Scanning with {n_active} input(s) active: {active_inputs}")
+            
+            # Set DM: turn off all, then turn on selected inputs
+            dm_object.off()  # Turn off all inputs
+            dm_object.max(active_inputs)  # Turn on selected inputs
+            
+            # Scan each shifter
+            for shifter_idx, shifter in enumerate(self.channels):
+                scan_count += 1
+                
+                if verbose:
+                    print(f"  [{scan_count}/{total_scans}] Shifter {shifter.channel} " +
+                          f"(TOPA {shifter_idx+1}/{len(self.channels)})")
+                
+                # Turn off all shifters, prepare to scan this one
+                self.turn_off(verbose=False)
+                
+                fluxes = []
+                
+                # Scan phase
+                for phase in phase_range:
+                    shifter.set_phase(phase)
+                    
+                    # Average multiple frames
+                    temp_fluxes = []
+                    for _ in range(n_averages):
+                        outs = cred3_object.get_outputs(crop_centers=crop_centers, 
+                                                       crop_sizes=crop_sizes)
+                        temp_fluxes.append(outs)
+                    
+                    fluxes.append(np.mean(temp_fluxes, axis=0))
+                
+                fluxes = np.array(fluxes)  # Shape: (phase_samples, n_outputs)
+                
+                # Save this scan
+                filename = f"{combo_label}_shifter{shifter.channel}.npz"
+                filepath = os.path.join(base_dir, filename)
+                
+                np.savez(filepath,
+                        phases=phase_range,
+                        fluxes=fluxes,
+                        active_inputs=np.array(active_inputs),
+                        shifter_channel=shifter.channel,
+                        shifter_index=shifter_idx,
+                        n_inputs_active=n_active,
+                        n_outputs=self.n_outputs,
+                        crop_centers=crop_centers,
+                        crop_sizes=crop_sizes,
+                        n_averages=n_averages,
+                        timestamp=timestamp,
+                        arch_name=self.name,
+                        arch_number=self.number)
+                
+                if verbose:
+                    print(f"     ✅ Saved: {filename}")
+        
+        # Turn everything off at the end
+        self.turn_off(verbose=False)
+        dm_object.max()  # Restore all inputs
+        
+        if verbose:
+            print(f"\n✅ Characterization complete!")
+            print(f"   Total scans: {scan_count}")
+            print(f"   Data saved to: {base_dir}")
+        
+        # Automatically plot results if requested
+        if plot:
+            if verbose:
+                print(f"\n📊 Generating plots...")
+            self.plot_characterization(base_dir)
+        
+        return base_dir
+
+    @staticmethod
+    def plot_characterization(archive_path, output_dir=None):
+        """
+        Load and plot characterization results from an archive directory.
+        
+        Creates separate plots for each input count (1, 2, 3, 4 inputs) showing
+        all shifter responses.
+        
+        Parameters
+        ----------
+        archive_path : str
+            Path to the characterization archive directory.
+        output_dir : str, optional
+            Directory to save plots. If None, uses archive_path. Default is None.
+            
+        Returns
+        -------
+        dict
+            Dictionary mapping n_inputs -> list of figure objects.
+            
+        Examples
+        --------
+        >>> arch = Arch(6)
+        >>> # ... run characterization ...
+        >>> Arch.plot_characterization("generated/architecture_characterization/...")
+        """
+        if output_dir is None:
+            output_dir = archive_path
+        
+        # Find all .npz files
+        npz_files = [f for f in os.listdir(archive_path) if f.endswith('.npz')]
+        
+        if not npz_files:
+            print(f"❌ No .npz files found in {archive_path}")
+            return {}
+        
+        # Group files by number of active inputs
+        grouped_data = {1: [], 2: [], 3: [], 4: []}
+        
+        for npz_file in npz_files:
+            filepath = os.path.join(archive_path, npz_file)
+            data = np.load(filepath)
+            n_inputs = int(data['n_inputs_active'])
+            grouped_data[n_inputs].append((npz_file, data))
+        
+        figures = {}
+        
+        # Plot each input count group
+        for n_inputs in sorted(grouped_data.keys()):
+            if not grouped_data[n_inputs]:
+                continue
+            
+            print(f"📊 Plotting {n_inputs}-input scans...")
+            
+            # Determine grid size
+            n_scans = len(grouped_data[n_inputs])
+            cols = min(4, n_scans)
+            rows = int(np.ceil(n_scans / cols))
+            
+            fig, axs = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), 
+                                   constrained_layout=True)
+            
+            # Get architecture name from first file
+            arch_name = grouped_data[n_inputs][0][1]['arch_name']
+            timestamp = str(grouped_data[n_inputs][0][1]['timestamp'])
+            
+            fig.suptitle(f"{arch_name} - {n_inputs} Input(s) Active\n{timestamp}", 
+                        fontsize=14, fontweight='bold')
+            
+            if n_scans == 1:
+                axs = [axs]
+            elif rows == 1:
+                axs = axs
+            else:
+                axs = axs.flatten()
+            
+            for idx, (filename, data) in enumerate(grouped_data[n_inputs]):
+                ax = axs[idx]
+                
+                phases = data['phases']
+                fluxes = data['fluxes']
+                active_inputs = data['active_inputs']
+                shifter_ch = int(data['shifter_channel'])
+                n_outputs = int(data['n_outputs'])
+                
+                # Plot each output
+                for out_idx in range(fluxes.shape[1]):
+                    ax.plot(phases / np.pi, fluxes[:, out_idx], '-o', 
+                           markersize=3, label=f'Out {out_idx+1}', alpha=0.7)
+                
+                ax.set_xlabel("Phase (π rad)")
+                ax.set_ylabel("Flux (ADU)")
+                ax.set_title(f"Shifter {shifter_ch}\nInputs: {list(active_inputs)}")
+                ax.grid(True, alpha=0.3)
+                ax.legend(fontsize='small', ncol=2)
+            
+            # Hide unused subplots
+            for j in range(n_scans, len(axs)):
+                axs[j].axis('off')
+            
+            # Save figure
+            fig_filename = f"characterization_{n_inputs}inputs.png"
+            fig_path = os.path.join(output_dir, fig_filename)
+            fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+            print(f"   ✅ Saved: {fig_filename}")
+            
+            figures[n_inputs] = fig
+        
+        print(f"✅ Plotting complete. Figures saved to: {output_dir}")
+        return figures
 
 # Backward compatibility aliases
 class XPOWController(XPOW):
