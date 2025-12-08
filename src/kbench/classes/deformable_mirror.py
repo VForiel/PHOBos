@@ -19,7 +19,8 @@ class DM():
     _default_config_path = "./DM_config.json"
     _all = []
 
-    def __init__(self, serial_number:str = "27BW007#051", config_path:str = _default_config_path, stabilization_time:float = 1):
+    def __init__(self, serial_number:str = "27BW007#051", config_path:str = _default_config_path, 
+                 stabilization_time:float = 1, injection_segments:list = None):
         """
         Initialize the DM with the given serial number and configuration file.
 
@@ -31,6 +32,9 @@ class DM():
             Path to the configuration file.
         stabilization_time : float
             Time in seconds to wait for the DM to stabilize after setting the configuration.
+        injection_segments : list, optional
+            List of segment indices used for photonic chip injection.
+            Default is [135, 136, 137, 138] (0-indexed).
         """
 
         # Ensure that the DM is not already in use
@@ -40,6 +44,12 @@ class DM():
         DM._all.append(self)
 
         self._serial_number = serial_number
+        
+        # Set injection segments
+        if injection_segments is None:
+            self._injection_segments = [135, 136, 137, 138]
+        else:
+            self._injection_segments = list(injection_segments)
 
         # Initialize the DM with the given serial number
         self.bmcdm = bmc.BmcDm()
@@ -74,6 +84,30 @@ class DM():
     @segments.setter
     def segments(self, _):
         raise AttributeError("Segments are read-only and cannot be modified.")
+    
+    @property
+    def injection_segments(self) -> list:
+        """
+        Get the list of segment indices used for photonic chip injection.
+        
+        Returns
+        -------
+        list
+            List of segment indices (0-indexed).
+        """
+        return self._injection_segments
+    
+    @injection_segments.setter
+    def injection_segments(self, value):
+        """
+        Set the list of segment indices used for photonic chip injection.
+        
+        Parameters
+        ----------
+        value : list
+            List of segment indices (0-indexed).
+        """
+        self._injection_segments = list(value)
 
     #  Specific methods -------------------------------------------------------
 
@@ -182,6 +216,100 @@ class DM():
             segment.set_ptt(segment_config["piston"], segment_config["tip"], segment_config["tilt"])
         
         print("Configuration loaded")
+
+    def off(self, segments=None):
+        """
+        Turn off specified injection segments by applying maximum tilt.
+        
+        This tilts the segments to deflect light away from the photonic chip inputs.
+        
+        Parameters
+        ----------
+        segments : int, array-like, or None, optional
+            Segment input number(s) to turn off (1-4 for the 4 injection inputs).
+            - If int: single input number (e.g., 1 for first injection segment)
+            - If array-like: multiple input numbers (e.g., [1, 2, 4])
+            - If None: turns off all injection segments
+            Default is None.
+        
+        Examples
+        --------
+        >>> dm = DM()
+        >>> dm.off(1)           # Turn off first injection input
+        >>> dm.off([1, 3])      # Turn off inputs 1 and 3
+        >>> dm.off()            # Turn off all injection inputs
+        
+        Notes
+        -----
+        The off position is: piston=-1150 nm, tip=0 mrad, tilt=-5.47 mrad
+        """
+        # Parse segment indices
+        if segments is None:
+            # Turn off all injection segments
+            seg_indices = self._injection_segments
+        else:
+            # Convert input number(s) (1-4) to segment indices
+            if isinstance(segments, int):
+                segments = [segments]
+            
+            seg_indices = []
+            for seg_num in segments:
+                if not 1 <= seg_num <= len(self._injection_segments):
+                    raise ValueError(f"Segment number must be between 1 and {len(self._injection_segments)}, got {seg_num}")
+                seg_indices.append(self._injection_segments[seg_num - 1])
+        
+        # Apply off position to selected segments
+        for seg_idx in seg_indices:
+            self.segments[seg_idx].set_ptt(-1150, 0, -5.47)
+        
+        print(f"Turned off injection segments: {seg_indices}")
+    
+    def max(self, segments=None):
+        """
+        Reset specified injection segments to optimal injection position.
+        
+        This returns the segments to their nominal position for maximum light coupling.
+        
+        Parameters
+        ----------
+        segments : int, array-like, or None, optional
+            Segment input number(s) to optimize (1-4 for the 4 injection inputs).
+            - If int: single input number (e.g., 1 for first injection segment)
+            - If array-like: multiple input numbers (e.g., [1, 2, 4])
+            - If None: optimizes all injection segments
+            Default is None.
+        
+        Examples
+        --------
+        >>> dm = DM()
+        >>> dm.max(1)           # Optimize first injection input
+        >>> dm.max([1, 3])      # Optimize inputs 1 and 3
+        >>> dm.max()            # Optimize all injection inputs
+        
+        Notes
+        -----
+        The optimal position is: piston=0 nm, tip=0 mrad, tilt=0 mrad
+        """
+        # Parse segment indices
+        if segments is None:
+            # Optimize all injection segments
+            seg_indices = self._injection_segments
+        else:
+            # Convert input number(s) (1-4) to segment indices
+            if isinstance(segments, int):
+                segments = [segments]
+            
+            seg_indices = []
+            for seg_num in segments:
+                if not 1 <= seg_num <= len(self._injection_segments):
+                    raise ValueError(f"Segment number must be between 1 and {len(self._injection_segments)}, got {seg_num}")
+                seg_indices.append(self._injection_segments[seg_num - 1])
+        
+        # Apply optimal position to selected segments
+        for seg_idx in seg_indices:
+            self.segments[seg_idx].set_ptt(0, 0, 0)
+        
+        print(f"Optimized injection segments: {seg_indices}")
 
 #==============================================================================
 # Segment class
