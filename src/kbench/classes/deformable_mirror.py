@@ -371,7 +371,9 @@ class Segment():
             The response of the mirror.
         """
         self.piston = value
-        return self.dm.bmcdm.set_segment(self.id, value, self.tip, self.tilt, True, True)
+        response = self.dm.bmcdm.set_segment(self.id, value, self.tip, self.tilt, True, True)
+        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        return response
     
     def get_piston(self) -> float:
         """
@@ -412,7 +414,9 @@ class Segment():
             The response of the mirror.
         """
         self.tip = value / 1000.0
-        return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
+        response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
+        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        return response
 
     def get_tip(self) -> float:
         """
@@ -453,7 +457,9 @@ class Segment():
             The response of the mirror.
         """
         self.tilt = value / 1000.0
-        return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
+        response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
+        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        return response
 
     def get_tilt(self) -> float:
         """
@@ -506,7 +512,9 @@ class Segment():
         self.piston = piston
         self.tip = tip
         self.tilt = tilt
-        return self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)        
+        response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
+        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        return response        
 
     def get_ptt(self) -> tuple[float, float, float]:
         """
