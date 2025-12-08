@@ -15,7 +15,8 @@ class FilterWheel():
         Parameters
         ----------
         filter_port : str, optional
-            Serial port number. The default is "/dev/ttyUSB2".
+            Serial port for the Thorlabs filter wheel. 
+            Default is "/dev/ttyUSBthorlabs" (fixed udev rule).
 
         Returns
         -------

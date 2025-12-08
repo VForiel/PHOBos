@@ -48,10 +48,12 @@ class PupilMask():
 
         Parameters
         ----------
-        zaber_port : str
-            Port for the Zaber motors (default is "/dev/ttyUSB2").
-        newport_port : str
-            Port for the Newport motor (default is "/dev/ttyUSB1").
+        zaber_port : str, optional
+            Serial port for Zaber linear stages.
+            Default is "/dev/ttyUSBzaber" (fixed udev rule).
+        newport_port : str, optional
+            Serial port for Newport rotary stage.
+            Default is "/dev/ttyUSBnewport" (fixed udev rule).
         zaber_h_home : int
             Home position for the horizontal motor (default is 188490).
         zaber_v_home : int

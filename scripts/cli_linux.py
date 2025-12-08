@@ -253,16 +253,15 @@ def control_config(args):
                 sys.exit(1)
         
         print("🔧 Creating new configuration file...")
-        print("📝 Please provide the following information:")
+        print("📝 Configuration will use fixed USB ports (udev rules):")
+        print("   - Newport:     /dev/ttyUSBnewport")
+        print("   - Zaber:       /dev/ttyUSBzaber")
+        print("   - Filter Wheel: /dev/ttyUSBthorlabs")
         
-        # Get mask configuration
-        print("\n📐 Mask Configuration:")
-        newport_port = input("  Newport port (default: /dev/ttyUSB0): ").strip() or "/dev/ttyUSB0"
-        zaber_port = input("  Zaber port (default: /dev/ttyUSB1): ").strip() or "/dev/ttyUSB1"
-        
-        # Get filter configuration
-        print("\n🔍 Filter Configuration:")
-        filter_port = input("  Filter wheel port (default: /dev/ttyUSB2): ").strip() or "/dev/ttyUSB2"
+        # Fixed ports based on udev rules
+        newport_port = "/dev/ttyUSBnewport"
+        zaber_port = "/dev/ttyUSBzaber"
+        filter_port = "/dev/ttyUSBthorlabs"
         
         # Create configuration structure
         config = {
@@ -352,10 +351,8 @@ def control_mask_config(args):
         # Get current positions
         print("⌛ Reading current mask positions...")
         config = get_config()
-        p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'],
-            zaber_port=config['mask']['ports']['zaber']
-        )
+        # Use default ports (fixed via udev rules)
+        p = kbench.PupilMask()
         
         # Get current positions
         # get_pos() returns (wheel_angle, zaber_vertical, zaber_horizontal)
@@ -366,7 +363,7 @@ def control_mask_config(args):
         
         # Update config
         if 'mask' not in config:
-            config['mask'] = {'slots': {}, 'ports': {'newport': '/dev/ttyUSB0', 'zaber': '/dev/ttyUSB1'}}
+            config['mask'] = {'slots': {}}
         if 'slots' not in config['mask']:
             config['mask']['slots'] = {}
             
@@ -453,14 +450,15 @@ def control_filter_config(args):
         # Get current position
         print("⌛ Reading current filter position...")
         config = get_config()
-        fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
+        # Use default port (fixed via udev rules)
+        fw = kbench.FilterWheel()
         
         # Get current position
         current_slot = fw.get_pos()
         
         # Update config
         if 'filter' not in config:
-            config['filter'] = {'slots': {}, 'port': '/dev/ttyUSB0'}
+            config['filter'] = {'slots': {}}
         if 'slots' not in config['filter']:
             config['filter']['slots'] = {}
             
@@ -637,10 +635,8 @@ def control_mask(args):
     if args[0] in ['home']:
         print("⌛ Homing mask...")
         
-        p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
-            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
-        )
+        # Use default ports (fixed via udev rules)
+        p = kbench.PupilMask()
         p.newport.home_search()
         
         print("✅ Done")
@@ -662,10 +658,8 @@ def control_mask(args):
                 # Use direct rotation without configuration file override
                 print(f'⌛ Setting mask to position {mask_number}...')
                 
-                p = kbench.PupilMask(
-                    newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
-                    zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
-                )
+                # Use default ports (fixed via udev rules)
+                p = kbench.PupilMask()
                 
                 # Only rotate the wheel, don't touch x and y axes
                 p.apply_mask(mask_number)
@@ -685,10 +679,8 @@ def control_mask(args):
 
         print(f'⌛ Setting "{mask}" mask...')
         
-        p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
-            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
-        )
+        # Use default ports (fixed via udev rules)
+        p = kbench.PupilMask()
 
         # Use the mask configuration (either from config file or defaults)
         mask_config = masks[mask]
@@ -723,10 +715,8 @@ def control_mask(args):
 
         print(f"⌛ Moving mask...")
 
-        p = kbench.PupilMask(
-            newport_port=config['mask']['ports']['newport'] if config else '/dev/ttyUSB0',
-            zaber_port=config['mask']['ports']['zaber'] if config else '/dev/ttyUSB1'
-        )
+        # Use default ports (fixed via udev rules)
+        p = kbench.PupilMask()
 
         try:
             if len(args) > 1 and args[1] in ['-a', '--abs']:
@@ -819,11 +809,8 @@ def control_filter(args):
     if args[0] in ['get']:
         print("⌛ Getting current filter position...")
         
-        if is_config_set():
-            config = get_config()
-            fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
-        else:
-            fw = kbench.FilterWheel()
+        # Use default port (fixed via udev rules)
+        fw = kbench.FilterWheel()
         
         current_slot = fw.get_pos()
         
@@ -867,9 +854,8 @@ def control_filter(args):
 
         if is_config_set():
             config = get_config()
-            fw = kbench.FilterWheel(filter_port=config.get('filter', {}).get('port', '/dev/ttyUSB0'))
-        else:
-            fw = kbench.FilterWheel()
+        # Use default port (fixed via udev rules)
+        fw = kbench.FilterWheel()
         fw.move(slot)
         print("✅ Done")
         sys.exit(0)
