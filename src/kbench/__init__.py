@@ -30,8 +30,6 @@ else:
 if SANDBOX_MODE:
     from .sandbox import xaosim_mock as xaosim
     shm = xaosim.shm
-    if not _SPHINX_BUILD:
-        print("⛱️ xaosim mock enabled (sandbox mode)")
 else:
     try:
         from xaosim.shmlib import shm

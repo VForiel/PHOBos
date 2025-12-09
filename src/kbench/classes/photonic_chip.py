@@ -1697,6 +1697,15 @@ class Arch:
             n_cols = len(input_combos)
             n_rows = len(shifter_channels)
             
+            # Find global Y limits for synchronization
+            y_min_global, y_max_global = np.inf, -np.inf
+            for shifter_ch in shifter_channels:
+                if shifter_ch in scan_structure[n_inputs]:
+                    for scan in scan_structure[n_inputs][shifter_ch]:
+                        fluxes = scan['fluxes']
+                        y_min_global = min(y_min_global, np.min(fluxes))
+                        y_max_global = max(y_max_global, np.max(fluxes))
+            
             # Create figure
             fig, axs = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows), 
                                    constrained_layout=True)
@@ -1768,6 +1777,9 @@ class Arch:
                     ax.grid(True, alpha=0.3)
                     if n_outputs <= 4:  # Only show legend if not too many outputs
                         ax.legend(fontsize='x-small', ncol=2, loc='best')
+                    
+                    # Synchronize Y-axis across all subplots
+                    ax.set_ylim(y_min_global, y_max_global)
             
             # Save figure
             fig_filename = f"characterization_{n_inputs}inputs.png"
@@ -1776,6 +1788,112 @@ class Arch:
             print(f"   ✅ Saved: {fig_filename}")
             
             figures[n_inputs] = fig
+            
+            # ========== CREATE CENTERED VERSION (mean-subtracted) ==========
+            print(f"📊 Plotting {n_inputs}-input configuration(s) (mean-subtracted)...")
+            
+            # Find global maximum amplitude for normalization
+            max_amplitude = 0.0
+            for shifter_ch in shifter_channels:
+                if shifter_ch in scan_structure[n_inputs]:
+                    for scan in scan_structure[n_inputs][shifter_ch]:
+                        fluxes = scan['fluxes']
+                        for out_idx in range(fluxes.shape[1]):
+                            centered = fluxes[:, out_idx] - np.mean(fluxes[:, out_idx])
+                            amplitude = np.max(np.abs(centered))
+                            max_amplitude = max(max_amplitude, amplitude)
+            
+            # Create centered figure
+            fig_centered, axs_centered = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows), 
+                                                      constrained_layout=True)
+            
+            fig_centered.suptitle(f"{arch_name} - {n_inputs} Input(s) Active (Mean-Subtracted)\n{timestamp}", 
+                                 fontsize=14, fontweight='bold')
+            
+            # Ensure axs_centered is 2D array
+            if n_rows == 1 and n_cols == 1:
+                axs_centered = np.array([[axs_centered]])
+            elif n_rows == 1:
+                axs_centered = axs_centered.reshape(1, -1)
+            elif n_cols == 1:
+                axs_centered = axs_centered.reshape(-1, 1)
+            
+            # Plot each cell with centered data
+            for row_idx, shifter_ch in enumerate(shifter_channels):
+                for col_idx, input_combo in enumerate(input_combos):
+                    ax = axs_centered[row_idx, col_idx]
+                    
+                    # Find the scan for this shifter and input combination
+                    scan_data = None
+                    if shifter_ch in scan_structure[n_inputs]:
+                        for scan in scan_structure[n_inputs][shifter_ch]:
+                            if scan['active_inputs'] == input_combo:
+                                scan_data = scan
+                                break
+                    
+                    if scan_data is None:
+                        ax.text(0.5, 0.5, 'No data', ha='center', va='center', 
+                               transform=ax.transAxes)
+                        ax.set_title(f"Shifter {shifter_ch}\nInputs: {list(input_combo)}")
+                        ax.axis('off')
+                        continue
+                    
+                    # Extract data
+                    phases = scan_data['phases']
+                    fluxes = scan_data['fluxes']
+                    active_inputs = scan_data['active_inputs']
+                    fit_params = scan_data['fit_params']
+                    fit_success = scan_data['fit_success']
+                    n_outputs = fluxes.shape[1]
+                    
+                    # Dense phase array for smooth fit curves
+                    phase_dense = np.linspace(0, 2*np.pi, 200)
+                    
+                    # Plot each output (centered and normalized)
+                    for out_idx in range(n_outputs):
+                        # Subtract mean and normalize by max amplitude
+                        flux_centered = fluxes[:, out_idx] - np.mean(fluxes[:, out_idx])
+                        flux_normalized = flux_centered / max_amplitude if max_amplitude > 0 else flux_centered
+                        
+                        # Plot normalized data points
+                        ax.plot(phases / np.pi, flux_normalized, 'o', 
+                               markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
+                        
+                        # Plot normalized fit if successful
+                        if fit_success[out_idx]:
+                            fit_curve = sine_func(phase_dense, *fit_params[out_idx])
+                            fit_curve_centered = fit_curve - np.mean(sine_func(phases, *fit_params[out_idx]))
+                            fit_curve_normalized = fit_curve_centered / max_amplitude if max_amplitude > 0 else fit_curve_centered
+                            ax.plot(phase_dense / np.pi, fit_curve_normalized, '-', 
+                                   linewidth=1.5, alpha=0.8)
+                    
+                    # Labels and title
+                    ax.set_xlabel("Phase (π rad)", fontsize=9)
+                    if col_idx == 0:
+                        ax.set_ylabel("Normalized Flux", fontsize=9)
+                    
+                    # Title with shifter and inputs info
+                    inputs_str = ','.join(map(str, active_inputs))
+                    ax.set_title(f"Shifter {shifter_ch}\nInputs: [{inputs_str}]", 
+                                fontsize=10)
+                    
+                    ax.grid(True, alpha=0.3)
+                    if n_outputs <= 4:  # Only show legend if not too many outputs
+                        ax.legend(fontsize='x-small', ncol=2, loc='best')
+                    
+                    # Set Y-axis limits to [-1, 1]
+                    ax.set_ylim(-1.1, 1.1)
+                    
+                    # Add horizontal line at y=0
+                    ax.axhline(0, color='k', linestyle='--', linewidth=0.5, alpha=0.3)
+            
+            # Save centered figure
+            fig_centered_filename = f"characterization_{n_inputs}inputs_centered.png"
+            fig_centered_path = os.path.join(output_dir, fig_centered_filename)
+            fig_centered.savefig(fig_centered_path, dpi=150, bbox_inches='tight')
+            print(f"   ✅ Saved: {fig_centered_filename}")
+            
+            figures[f"{n_inputs}_centered"] = fig_centered
         
         print(f"✅ Plotting complete. Figures saved to: {output_dir}")
         return figures
