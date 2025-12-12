@@ -1,8 +1,8 @@
 import numpy as np
 from .. import serial
 import time
-import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+# import matplotlib.pyplot as plt  # Lazy loaded
+# from scipy.optimize import curve_fit # Lazy loaded
 from .. import SANDBOX_MODE
 import re
 import warnings
@@ -705,6 +705,7 @@ class PhaseShifter:
         _xpow.VOLT_CORRECTION[self.channel - 1] = new_volt
         
         if plot:
+            import matplotlib.pyplot as plt
             plt.figure(figsize=(10,4))
             plt.subplot(1,2,1)
             plt.plot(test_currents, measured, 'o-', label=f'CH{self.channel} Current')
@@ -1280,6 +1281,7 @@ class Arch:
             n_channels = len(self.channels)
             cols = int(np.ceil(np.sqrt(n_channels)))
             rows = int(np.ceil(n_channels / cols))
+            import matplotlib.pyplot as plt
             fig, axs = plt.subplots(rows, cols, figsize=(4*cols, 3*rows), constrained_layout=True)
             fig.suptitle(f"Phase Calibration - {self.name}")
             if n_channels > 1:
@@ -1341,6 +1343,7 @@ class Arch:
                 p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data), 0]
                 
                 try:
+                    from scipy.optimize import curve_fit
                     popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, maxfev=10000)
                     
                     A, B, C, D, E, F = popt
@@ -1535,6 +1538,7 @@ class Arch:
                         p0 = [flux_amp, 1.0, 0.0, 0.0, flux_mean, 0.0]  # [A, B, C, D, E, F]
                         
                         # Fit
+                        from scipy.optimize import curve_fit
                         popt, _ = curve_fit(sine_func, phase_range, fluxes[:, out_idx], 
                                            p0=p0, maxfev=5000)
                         fit_params[out_idx] = popt
@@ -1707,6 +1711,7 @@ class Arch:
                         y_max_global = max(y_max_global, np.max(fluxes))
             
             # Create figure
+            import matplotlib.pyplot as plt
             fig, axs = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows), 
                                    constrained_layout=True)
             
@@ -1804,6 +1809,8 @@ class Arch:
                             max_amplitude = max(max_amplitude, amplitude)
             
             # Create centered figure
+# Create centered figure
+            import matplotlib.pyplot as plt
             fig_centered, axs_centered = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows), 
                                                       constrained_layout=True)
             

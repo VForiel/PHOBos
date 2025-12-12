@@ -1,8 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.patches import Circle
-import astropy.units as u
+# import matplotlib.pyplot as plt
+# import matplotlib.animation as animation
+# from matplotlib.patches import Circle
+# import astropy.units as u
 
 
 def atmo_screen_kolmogorov(size, physical_size, r0, L0, fc=25, correc=1.0):
@@ -228,6 +228,9 @@ def get_delays(
     
     # Animation if demo mode
     if demo:
+        import matplotlib.pyplot as plt
+        import matplotlib.animation as animation
+        from matplotlib.patches import Circle
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
         
         # Prepare figure for phase screen
@@ -381,6 +384,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     # Get telescope positions (example: UTs at Paranal)
+    import astropy.units as u
     r = np.array([[-70.4048732988764, -24.627602893919807], [-70.40465753243652, -24.627118902835786], [-70.40439460074228, -24.62681028261176], [-70.40384287956437, -24.627033500373024]])
     r -= r[0]
     earth_radius = 6378137 * u.m
