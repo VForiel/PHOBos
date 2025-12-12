@@ -1,6 +1,6 @@
 [project]
 name = "phob-os"
-version = "0.7.3"
+version = "0.8.0"
 description = "Python package for controlling optical test bench equipment in kernel-nulling interferometry"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},

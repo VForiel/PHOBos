@@ -18,8 +18,7 @@ jobs:
           auto-update-conda: true
           python-version: '3.12'
           channels: conda-forge,defaults
-          environment-file: environment.yml
-          activate-environment: Kbench
+          activate-environment: phob-os
 
       - name: Verify conda environment
         shell: bash -l {0}
