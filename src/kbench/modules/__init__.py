@@ -1,10 +1,3 @@
-"""
-Simulation modules for Kbench-Controls.
-
-This package contains simulation modules for different aspects
-of the kernel-nulling optical bench.
-"""
-
-from . import atmosphere
-
-__all__ = ['atmosphere']
+from phobos.modules import *
+import warnings
+# warnings.warn("This package is deprecated. Use phobos.modules instead.", DeprecationWarning, stacklevel=2)

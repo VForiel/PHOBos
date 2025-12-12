@@ -1,16 +1,20 @@
 [project]
-name = "kbench-controls"
+name = "phob-os"
 version = "0.7.3"
 description = "Python package for controlling optical test bench equipment in kernel-nulling interferometry"
 authors = [
     {name = "Vincent Foriel", email = "vincent.foriel@gmail.com"},
     {name = "mmartinod", email = "ma.martinod@free.fr"},
 ]
-dynamic = ["dependencies"]
+dependencies = [
+    "numpy",
+    "pyserial",
+    "pyyaml",
+    "toml>=0.10.2",
+]
 requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
-
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -20,6 +24,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 
+[project.scripts]
+phob = "phobos.scripts.cli:main"
+kbch = "kbench.scripts.cli:main"
+
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -27,12 +35,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["kbench*", "bmc*"]
+include = ["phobos*", "kbench*", "bmc*"]
 
 [tool.setuptools.package-data]
 "bmc" = ["*.so"]

@@ -1,8 +1,8 @@
-# Kernel test bench controls
+# PHOBos - Photonics Bench Operating System
 
 This repo aim to provide a full set of tools to control all the devices on the Kernel-Nuller test bench.
 
-> **⚠️ Important:** This package is designed to run on the PHOTONICS lab PC with specific hardware (BMC deformable mirror, Thorlabs filter wheel, Newport/Zaber motors, C-RED3 camera). Outside this environment, the library will automatically enter **sandbox mode** and simulate missing components with mock interfaces. See the [installation guide](https://kbench.readthedocs.io/en/latest/installation.html) for proper lab PC setup.
+> **⚠️ Important:** This package is designed to run on the PHOTONICS lab PC with specific hardware (BMC deformable mirror, Thorlabs filter wheel, Newport/Zaber motors, C-RED3 camera). Outside this environment, the library will automatically enter **sandbox mode** and simulate missing components with mock interfaces. See the [installation guide](https://phobos-controls.readthedocs.io/en/latest/installation.html) for proper lab PC setup.
 
 ## 🚀 Quickstart
 
@@ -11,7 +11,7 @@ Requirements:
 
 ### Lab PC Installation (with hardware)
 
-For the lab PC with all hardware connected, follow the complete [installation guide](https://kbench.readthedocs.io/en/latest/installation.html).
+For the lab PC with all hardware connected, follow the complete [installation guide](https://phobos-controls.readthedocs.io/en/latest/installation.html).
 
 Quick version:
 ```bash
@@ -31,7 +31,7 @@ The package will automatically detect missing hardware and run in **sandbox mode
 
 ## 📚 Documentation
 
-The documentation should be available at the adress: [kbench.readthedocs.io](http://kbench.readthedocs.io).
+The documentation should be available at the adress: [phobos-controls.readthedocs.io](http://phobos-controls.readthedocs.io).
 
 If you want to build the doc locally, once the project is setup (according to the instructions above):
 

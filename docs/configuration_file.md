@@ -1,6 +1,6 @@
 # Configuration File
 
-The configuration file is a YAML file that contains the settings for the Kbench software. It is used to define the hardware connections and the position of the different elements.
+The configuration file is a YAML file that contains the settings for the PHOBos software. It is used to define the hardware connections and the position of the different elements.
 
 File example:
 

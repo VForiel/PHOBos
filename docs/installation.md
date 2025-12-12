@@ -119,7 +119,7 @@ cd ~/Progs/repos/dcs/asgard-cred1-server
 
 ## USB Device Assignment
 
-To ensure USB devices are assigned to consistent ttyUSB ports for kbench:
+To ensure USB devices are assigned to consistent ttyUSB ports for phobos:
 
 Create the udev rules file:
 
@@ -148,7 +148,7 @@ Or reboot the computer.
 - `ttyUSBthorlabs`: Thorlabs filter wheel
 - `ttyUSBnewport`: Newport mask wheel
 
-kbench reads these device IDs from the `config.yml` file.
+phobos reads these device IDs from the `config.yml` file.
 
 ## Deformable Mirror (BMC)
 
@@ -238,16 +238,16 @@ This installs only the base dependencies. The package will automatically run in 
 Test the installation in Python:
 
 ```python
-import kbench
+import phobos
 
 # Check mode
-print(f"Sandbox mode: {kbench.SANDBOX_MODE}")
+print(f"Sandbox mode: {phobos.SANDBOX_MODE}")
 
 # Try initializing hardware (uses mocks if in sandbox mode)
-dm = kbench.DM()
-fw = kbench.FilterWheel()
-chip = kbench.Chip(6)
-camera = kbench.Cred3()
+dm = phobos.DM()
+fw = phobos.FilterWheel()
+chip = phobos.Chip(6)
+camera = phobos.Cred3()
 ```
 
 If BMC SDK is not installed, you'll see:

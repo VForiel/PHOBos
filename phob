@@ -13,10 +13,10 @@ else
 fi
 
 # Check that the Python script exists
-if [[ ! -f "$SCRIPT_DIR/src/kbench/scripts/cli.py" ]]; then
-    echo "Error: $SCRIPT_DIR/src/kbench/scripts/cli.py does not exist"
+if [[ ! -f "$SCRIPT_DIR/src/phobos/scripts/cli.py" ]]; then
+    echo "Error: $SCRIPT_DIR/src/phobos/scripts/cli.py does not exist"
     exit 1
 fi
 
 # Execute the Python script with all arguments
-"$PYTHON_CMD" "$SCRIPT_DIR/src/kbench/scripts/cli.py" "$@"
+"$PYTHON_CMD" "$SCRIPT_DIR/src/phobos/scripts/cli.py" "$@"

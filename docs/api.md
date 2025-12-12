@@ -1,6 +1,6 @@
 # API Documentation
 
-This section contains the complete API reference for all Kbench classes and modules.
+This section contains the complete API reference for all PHOBos classes and modules.
 
 ## Hardware Control Classes
 

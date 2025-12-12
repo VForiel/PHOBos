@@ -1,7 +1,7 @@
 # Deformable Mirror
 
 ```{eval-rst}
-.. autoclass:: kbench.DM
+.. autoclass:: phobos.DM
    :members:
    :show-inheritance:
 ```

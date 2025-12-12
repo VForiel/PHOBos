@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path('..', 'src').resolve()))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Kbench'
+project = 'PHOBos'
 author = 'Photonics'
 year = datetime.now().year
 copyright = f'{year}, {author}'
@@ -75,7 +75,7 @@ html_theme = 'breeze'
 html_static_path = ['_static']
 
 # Breeze theme configuration
-html_title = "Kbench"
+html_title = "PHOBos"
 html_context = {
     "github_user": "Kernel-Nulling",
     "github_repo": "Test-bench-controls",
