@@ -1,7 +1,7 @@
 # Segment
 
 ```{eval-rst}
-.. autoclass:: kbench.Segment
+.. autoclass:: phobos.Segment
    :members:
    :show-inheritance:
 ```

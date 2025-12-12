@@ -2,11 +2,11 @@
 
 :::{note}
 The Cred3 camera class requires the `xaosim` package, which is only compatible with Linux/Unix systems.
-To install with camera support: `pip install kbench-controls[camera]`
+To install with camera support: `pip install phobos-controls[camera]`
 :::
 
 ```{eval-rst}
-.. autoclass:: kbench.Cred3
+.. autoclass:: phobos.Cred3
    :members:
    :show-inheritance:
 ```

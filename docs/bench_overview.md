@@ -1,9 +1,17 @@
 # Bench overview
 
-```{image} _static/Kbench_full1.png
+```{image} _static/PHOB_full1.png
 :align: center
 ```
 
-```{image} _static/Kbench_full3.png
+```{image} _static/PHOB_full2.png
+:align: center
+```
+
+```{image} _static/PHOB_full3.png
+:align: center
+```
+
+```{image} _static/Photonics1.png
 :align: center
 ```

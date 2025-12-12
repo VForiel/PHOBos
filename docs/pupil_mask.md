@@ -1,7 +1,7 @@
 # Pupil Mask
 
 ```{eval-rst}
-.. autoclass:: kbench.PupilMask
+.. autoclass:: phobos.PupilMask
    :members:
    :show-inheritance:
 ```
