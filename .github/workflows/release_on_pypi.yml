@@ -18,7 +18,7 @@ jobs:
           auto-update-conda: true
           python-version: '3.12'
           channels: conda-forge,defaults
-          activate-environment: phob-os
+          activate-environment: phob
 
       - name: Verify conda environment
         shell: bash -l {0}

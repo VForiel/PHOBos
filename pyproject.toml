@@ -1,5 +1,5 @@
 [project]
-name = "phob-os"
+name = "phob"
 version = "0.8.0"
 description = "Python package for controlling optical test bench equipment in kernel-nulling interferometry"
 authors = [
