@@ -33,8 +33,8 @@ class DM():
         stabilization_time : float
             Time in seconds to wait for the DM to stabilize after setting the configuration.
         injection_segments : list, optional
-            List of segment indices used for photonic chip injection.
-            Default is [135, 136, 137, 138] (0-indexed).
+            List of segment indices used for photonic chip injection (inputs [1, 2, 3, 4]).
+            Default is [138, 137, 136, 135] (0-indexed).
         """
 
         # Ensure that the DM is not already in use
@@ -47,7 +47,7 @@ class DM():
         
         # Set injection segments
         if injection_segments is None:
-            self._injection_segments = [135, 136, 137, 138]
+            self._injection_segments = [138, 137, 136, 135]
         else:
             self._injection_segments = list(injection_segments)
 
