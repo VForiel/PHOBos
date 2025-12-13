@@ -157,7 +157,8 @@ def generate_summary_plot():
     # Groups: 1 active, 2 active, 3 active, 4 active
     for num_active in range(1, 5):
         # Filter masks
-        group_masks = sorted([m for m in all_masks if sum(m) == num_active], key=lambda m: m)
+        # Sort desc to get (1,0,0,0) before (0,0,0,1)
+        group_masks = sorted([m for m in all_masks if sum(m) == num_active], key=lambda m: m, reverse=True)
         
         if not group_masks:
             print(f"No data for {num_active} active inputs.")
@@ -168,25 +169,71 @@ def generate_summary_plot():
         
         print(f"Generating plot for {num_active} Active Inputs. Grid: {n_rows}x{n_cols}")
         
+        # 2b. Determine Global Y-Limits for this group
+        # Scan through all data in this group to find max AND min intensity
+        max_intensity = float('-inf')
+        min_intensity = float('inf')
+        
+        has_data = False
+        
+        for r in range(n_rows):
+            shifter_idx = r
+            for c, mask in enumerate(group_masks):
+                if shifter_idx in data_map.get(mask, {}):
+                    key = data_map[mask][shifter_idx]
+                    data = raw_data[key]
+                    max_intensity = max(max_intensity, np.max(data))
+                    min_intensity = min(min_intensity, np.min(data))
+                    has_data = True
+                    
+                    # Also check model prediction
+                    n_points = 20 # coarse check
+                    phases = np.linspace(0, 2*np.pi, n_points)
+                    model_p = predict_intensities(mask, shifter_idx, phases)
+                    max_intensity = max(max_intensity, np.max(model_p))
+                    min_intensity = min(min_intensity, np.min(model_p))
+
+        if not has_data:
+            max_intensity = 1.0
+            min_intensity = 0.0
+
+        # Add 5% padding
+        intensity_range = max_intensity - min_intensity
+        if intensity_range == 0: intensity_range = 1.0
+        
+        y_lim_bottom = max(0, min_intensity - 0.05 * intensity_range) # Clamp bottom to 0 if close
+        # Actually user might want to see noise floor even if not 0.
+        # "entre la valeur minimum et maximum"
+        y_lim_bottom = min_intensity - 0.05 * intensity_range
+        y_lim_top = max_intensity + 0.05 * intensity_range
+        
         # 3. Create Figure
         # Width scales with columns
         fig_width = max(5, n_cols * 3)
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(fig_width, n_rows*2.5), constrained_layout=True, squeeze=False)
-        fig.suptitle(f"{num_active} Active Inputs", fontsize=16)
+        fig.suptitle(f"{num_active} Active Inputs (Y-Range: {min_intensity:.1f} - {max_intensity:.1f})", fontsize=16)
         
         # Iterate Row-wise (Shifter) then Col-wise (Mask)
-        for r in range(n_rows): # Shifter 0-3
-            shifter_idx = r
+        # User requested: Input 1 at Top (Label), but Data inverted (Input 4 Data at Top)
+        for r in range(n_rows): # 0, 1, 2, 3
+            # Data: 3 down to 0 (Input 4 -> Input 1)
+            shifter_idx = (n_rows - 1) - r 
+            # Label: 1 up to 4
+            label_idx = r # 0 -> 3
             
             for c, mask in enumerate(group_masks):
                 ax = axs[r, c]
+                
+                # Apply Global Limits
+                ax.set_ylim(y_lim_bottom, y_lim_top)
                 
                 # Setup Axis info
                 active_ids = active_indices_1based(mask)
                 if r == 0:
                     ax.set_title(f"Inputs: {active_ids}", fontsize=10)
                 if c == 0:
-                    ax.set_ylabel(f"Scan Input {r+1}", fontsize=10, rotation=90)
+                    # Label based on Row Position (1 at Top)
+                    ax.set_ylabel(f"Scan Input {label_idx+1}", fontsize=10, rotation=90)
                 
                 # Turn ticks back on
                 # ax.set_xticks([]) 
