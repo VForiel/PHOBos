@@ -115,9 +115,9 @@ class Cred3:
     def crop_outputs_from_image(self, 
                                img: np.ndarray, 
                                crop_centers: np.ndarray = None, 
-                               crop_sizes=10) -> np.ndarray:
+                               crop_sizes=10) -> list[np.ndarray]:
         """
-        Crop regions around specified centers from an image and return averaged flux.
+        Crop regions around specified centers from an image and return them.
         
         Parameters
         ----------
@@ -134,12 +134,12 @@ class Cred3:
             
         Returns
         -------
-        flux : ndarray
-            Integrated flux (sum of pixel values) in each cropped region, shape (N,).
+        crops : list of ndarray
+            List of cropped sub-images.
         """
 
         img = np.transpose(img)  # Transpose to match (x, y) indexing
-            
+        
         # Handle crop_sizes - convert to array
         n_outputs = crop_centers.shape[0]
         if isinstance(crop_sizes, (int, float)):
@@ -151,7 +151,7 @@ class Cred3:
                                f"number of centers ({n_outputs})")
         
         # Compute flux for each output
-        flux = np.zeros(n_outputs)
+        crops = []
         for i in range(n_outputs):
             x_center, y_center = crop_centers[i]
             crop_size = crop_sizes_array[i]
@@ -159,30 +159,34 @@ class Cred3:
             
             # Define crop boundaries
             x1 = int(x_center - half_size)
-            x2 = int(x_center + half_size + 1)
+            x2 = int(x1 + crop_size)
             y1 = int(y_center - half_size)
-            y2 = int(y_center + half_size + 1)
+            y2 = int(y1 + crop_size)
             
-            # Extract crop and compute flux
+            # Extract crop
             # Handle boundary conditions to avoid errors if crop is outside image
             try:
                 crop = img[x1:x2, y1:y2]
-                flux[i] = np.mean(crop)
+                crops.append(crop)
             except IndexError:
                 print(f"⚠️ Crop region {i} outside image boundaries")
-                flux[i] = 0.0
+                # Append empty array or zeros matching size if possible, or None
+                # For robustness let's append a zero array of expected size
+                crops.append(np.zeros((crop_size, crop_size)))
         
-        return flux
+        return [crop.copy() for crop in crops]
 
     def get_outputs(self, 
                    crop_centers: np.ndarray = None,
                    crop_sizes=10,
-                   subtract_dark: bool = True) -> np.ndarray:
+                   subtract_dark: bool = True,
+                   flux_mode: str = 'mean') -> np.ndarray:
         """
-        Get the averaged flux around specified output centers.
+        Get the flux around specified output centers.
         
         This method crops regions around specified centers and returns
-        the integrated flux (sum) in each region.
+        the flux in each region. The flux can be the mean pixel value
+        or the sum of pixel values.
         
         Parameters
         ----------
@@ -197,29 +201,45 @@ class Cred3:
         subtract_dark : bool, optional
             Whether to subtract dark frame. If None, uses initialization
             default. Default is True.
+        flux_mode : str, optional, 'mean' or 'sum'
+            Method to compute the flux. 
+            'mean': average of pixel values (default)
+            'sum': sum of pixel values
         
         Returns
         -------
         flux : ndarray
-            Integrated flux in each cropped region, shape (N,).
+            Flux in each cropped region, shape (N,).
         
         Examples
         --------
         >>> camera = Cred3()
-        >>> # Get outputs with default centers
+        >>> # Get averaged outputs with default centers
         >>> flux = camera.get_outputs()
+        >>> 
+        >>> # Get integrated flux (sum)
+        >>> flux_sum = camera.get_outputs(flux_mode='sum')
         >>> 
         >>> # Custom centers and crop size
         >>> centers = np.array([(100, 200), (300, 400)])
         >>> flux = camera.get_outputs(crop_centers=centers, crop_sizes=20)
-        >>> 
-        >>> # Different crop sizes for each output
-        >>> flux = camera.get_outputs(crop_sizes=(10, 15, 10, 10))
         """
         # Get the latest image
         img = self.get_image(subtract_dark=subtract_dark)
         
-        return self.crop_outputs_from_image(img, crop_centers=crop_centers, crop_sizes=crop_sizes)
+        crops = self.crop_outputs_from_image(img, crop_centers=crop_centers, crop_sizes=crop_sizes)
+        
+        # Compute flux
+        flux = np.zeros(len(crops))
+        for i, crop in enumerate(crops):
+            if flux_mode == 'sum':
+                flux[i] = np.sum(crop)
+            elif flux_mode == 'mean':
+                flux[i] = np.mean(crop)
+            else:
+                raise ValueError(f"Unknown flux_mode: {flux_mode}. Use 'mean' or 'sum'.")
+                
+        return flux
     
     def update_dark(self, dark_shm_path: str = None):
         """
