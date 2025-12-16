@@ -114,7 +114,7 @@ class Cred3:
     
     def crop_outputs_from_image(self, 
                                img: np.ndarray, 
-                               crop_centers: np.ndarray = None, 
+                               crop_centers: np.ndarray, 
                                crop_sizes=10) -> list[np.ndarray]:
         """
         Crop regions around specified centers from an image and return them.
@@ -123,10 +123,8 @@ class Cred3:
         ----------
         img : ndarray
             Input image to crop from.
-        crop_centers : ndarray, optional
+        crop_centers : ndarray
             Array of (x, y) coordinates for crop centers, shape (N, 2).
-            Default centers correspond to the 4 main outputs:
-            [(594, 114), (499, 90), (404, 66), (309, 42)]
         crop_sizes : int or tuple, optional
             Size of the crop window. If int, a square window of this size
             is used for all outputs. If tuple of length N, each output
@@ -167,17 +165,18 @@ class Cred3:
             # Handle boundary conditions to avoid errors if crop is outside image
             try:
                 crop = img[x1:x2, y1:y2]
-                crops.append(crop)
+                crops.append(crop.T)
             except IndexError:
                 print(f"⚠️ Crop region {i} outside image boundaries")
                 # Append empty array or zeros matching size if possible, or None
                 # For robustness let's append a zero array of expected size
                 crops.append(np.zeros((crop_size, crop_size)))
         
-        return [crop.copy() for crop in crops]
+        crops = np.array(crops)
+        return crops
 
-    def get_outputs(self, 
-                   crop_centers: np.ndarray = None,
+    def get_outputs(self,
+                   crop_centers: np.ndarray,
                    crop_sizes=10,
                    subtract_dark: bool = True,
                    flux_mode: str = 'mean') -> np.ndarray:
@@ -190,10 +189,8 @@ class Cred3:
         
         Parameters
         ----------
-        crop_centers : ndarray, optional
+        crop_centers : ndarray
             Array of (x, y) coordinates for crop centers, shape (N, 2).
-            Default centers correspond to the 4 main outputs:
-            [(594, 114), (499, 90), (404, 66), (309, 42)]
         crop_sizes : int or tuple, optional
             Size of the crop window. If int, a square window of this size
             is used for all outputs. If tuple of length N, each output
@@ -230,14 +227,12 @@ class Cred3:
         crops = self.crop_outputs_from_image(img, crop_centers=crop_centers, crop_sizes=crop_sizes)
         
         # Compute flux
-        flux = np.zeros(len(crops))
-        for i, crop in enumerate(crops):
-            if flux_mode == 'sum':
-                flux[i] = np.sum(crop)
-            elif flux_mode == 'mean':
-                flux[i] = np.mean(crop)
-            else:
-                raise ValueError(f"Unknown flux_mode: {flux_mode}. Use 'mean' or 'sum'.")
+        if flux_mode == 'sum':
+            flux = np.sum(crops, axis=(-1, -2))
+        elif flux_mode == 'mean':
+            flux = np.mean(crops, axis=(-1, -2))
+        else:
+            raise ValueError(f"Unknown flux_mode: {flux_mode}. Use 'mean' or 'sum'.")
                 
         return flux
     
