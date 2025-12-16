@@ -20,7 +20,7 @@ class DM():
     _all = []
 
     def __init__(self, serial_number:str = "27BW007#051", config_path:str = _default_config_path, 
-                 stabilization_time:float = 1, injection_segments:list = None):
+                 stabilization_time:float = 0.001, injection_segments:list = None):
         """
         Initialize the DM with the given serial number and configuration file.
 
@@ -372,7 +372,7 @@ class Segment():
         """
         self.piston = value
         response = self.dm.bmcdm.set_segment(self.id, value, self.tip, self.tilt, True, True)
-        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        # time.sleep(0.01)  # Stabilization delay for BMC hardware
         return response
     
     def get_piston(self) -> float:
@@ -415,7 +415,7 @@ class Segment():
         """
         self.tip = value / 1000.0
         response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
-        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        # time.sleep(0.01)  # Stabilization delay for BMC hardware
         return response
 
     def get_tip(self) -> float:
@@ -458,7 +458,7 @@ class Segment():
         """
         self.tilt = value / 1000.0
         response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, value, True, True)
-        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        # time.sleep(0.01)  # Stabilization delay for BMC hardware
         return response
 
     def get_tilt(self) -> float:
@@ -513,7 +513,7 @@ class Segment():
         self.tip = tip
         self.tilt = tilt
         response = self.dm.bmcdm.set_segment(self.id, self.piston, self.tip, self.tilt, True, True)
-        time.sleep(0.01)  # Stabilization delay for BMC hardware
+        # time.sleep(0.01)  # Stabilization delay for BMC hardware
         return response        
 
     def get_ptt(self) -> tuple[float, float, float]:
