@@ -172,8 +172,7 @@ class Cred3:
                 # For robustness let's append a zero array of expected size
                 crops.append(np.zeros((crop_size, crop_size)))
         
-        crops = np.array(crops)
-        return crops
+        return [crop.copy() for crop in crops]
 
     def get_outputs(self,
                    crop_centers: np.ndarray,
@@ -227,12 +226,14 @@ class Cred3:
         crops = self.crop_outputs_from_image(img, crop_centers=crop_centers, crop_sizes=crop_sizes)
         
         # Compute flux
-        if flux_mode == 'sum':
-            flux = np.sum(crops, axis=(-1, -2))
-        elif flux_mode == 'mean':
-            flux = np.mean(crops, axis=(-1, -2))
-        else:
-            raise ValueError(f"Unknown flux_mode: {flux_mode}. Use 'mean' or 'sum'.")
+        flux = np.zeros(len(crops))
+        for i, crop in enumerate(crops):        
+            if flux_mode == 'sum':
+                flux[i] = np.sum(crop)
+            elif flux_mode == 'mean':
+                flux[i] = np.mean(crop)
+            else:
+                raise ValueError(f"Unknown flux_mode: {flux_mode}. Use 'mean' or 'sum'.")
                 
         return flux
     
