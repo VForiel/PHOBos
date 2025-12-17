@@ -314,7 +314,7 @@ class Cred3:
             print(f"⛱️ [SANDBOX] Dark acquisition complete")
             return dark_mean
         
-        images = []
+        # images = []
         log_sem = []
         
         print(f"Taking {nb_frames} dark frames...")
@@ -324,13 +324,15 @@ class Cred3:
         
         # Acquire frames
         iterator = tqdm(range(nb_frames)) if use_tqdm else range(nb_frames)
+        images = np.zeros_like(self.cam.get_latest_data(self.semid))
         for ii in iterator:
             img = self.cam.get_latest_data(self.semid)
-            images.append(img)
+            # images.append(img)
+            images += img 
             semval = self.cam.sems[self.semid].value
             log_sem.append(semval)
         
-        images = np.array(images)
+        # images = np.array(images)
         print('Acquisition complete')
         
         # Check for late frames
@@ -340,7 +342,8 @@ class Cred3:
             print(f'⚠️ Total late frames: {len(mask)}')
         
         # Compute average dark
-        dark_mean = images.mean(axis=0)
+        # dark_mean = images.mean(axis=0)
+        dark_mean = images / nb_frames
         
         # Save to shared memory if requested
         if save_to_shm:
