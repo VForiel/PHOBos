@@ -728,16 +728,26 @@ class PhaseShifter:
 
 class Arch:
     """
-    Class to handle a specific photonic chip architecture via the XPOW controller.
+    Base class to handle a photonic chip architecture via the XPOW controller.
     
-    A Arch instance represents a specific architecture configuration and manages
-    a list of PhaseShifter objects corresponding to the TOPAs in that architecture.
+    This class should be subclassed for specific architectures (e.g. Arch1, Arch6).
+    It manages a list of PhaseShifter objects corresponding to the TOPAs in that architecture.
     All chip instances share the same XPOW controller connection.
     
     Parameters
     ----------
-    arch : int
-        Architecture number (1-20). See ARCHS dictionary for available architectures.
+    name : str
+        Human-readable name of the architecture.
+    id : str
+        Architecture identifier code.
+    n_inputs : int
+        Number of input ports.
+    n_outputs : int
+        Number of output ports.
+    topas : tuple
+        Absolute channel numbers for TOPAs in this architecture.
+    number : int, optional
+        Architecture number.
         
     Attributes
     ----------
@@ -757,200 +767,35 @@ class Arch:
         List of PhaseShifter instances (indexed from 0).
     xpow : XPOW
         Reference to the singleton XPOW controller.
-        
-    Examples
-    --------
-    Create a chip with architecture 6 and control all channels:
-    
-    >>> chip = Arch(6)
-    >>> chip.set_currents([10.0, 15.0, 20.0, 25.0])  # Set all 4 TOPAs
-    >>> currents = chip.get_currents()  # Read all TOPA currents
-    
-    Access individual channels:
-    
-    >>> chip.channels[0].set_voltage(2.5)  # First TOPA
-    >>> chip[1].set_current(50.0)  # Second TOPA (1-indexed via __getitem__)
-    
-    Notes
-    -----
-    TOPAs are control using the XPOW controller via a serial connection. 
-    The XPOW documentation: https://www.nicslab.com/product-datasheet
     """
-
-    # Data extracted from Nick's lab book
-    ARCHS = {
-        1:  {
-            'name': "Mach-Zehnder Interferometer",
-            'id': 'MZI-T12',
-            'n_inputs': 1,
-            'n_outputs': 1,
-            'topas': (1,2),
-            },
-        2:  {
-            'name': "Phase Shifter Solo",
-            'id': 'PM-T11',
-            'n_inputs': 1,
-            'n_outputs': 1,
-            'topas': (3,),
-            },
-        3:  {
-            'name': "2x2 MMI Solo",
-            'id': 'MMI2x2-T10',
-            'n_inputs': 2,
-            'n_outputs': 2,
-            'topas': (),
-            },
-        4:  {
-            'name': "1x2 MMI Solo",
-            'id': 'MMI1x2-T9',
-            'n_inputs': 1,
-            'n_outputs': 2,
-            'topas': (),
-            },
-        5:  {
-            'name': "4-Port Nuller Reconfig",
-            'id': 'N4x4-D8',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (4,5,6,7,8,9,10,11,12,13,14,15,16),
-            },
-        6:  {
-            'name': "4-Port MMI Active",
-            'id': 'N4x4-T8',
-            'n_inputs': 4,
-            'n_outputs': 4,
-            'topas': (17,18,19,20),
-            },
-        7:  {
-            'name': "4-Port Nuller (passive) - FT",
-            'id': 'N4x4-D7',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (21,22,23,24),
-            },
-        8:  {
-            'name': "Mach-Zender Interferometer",
-            'id': 'MZI-T7',
-            'n_inputs': 1,
-            'n_outputs': 1,
-            'topas': (4,5),
-            },
-        9:  {
-            'name': "Normal 4-Port Nuller (active 2x2)",
-            'id': 'N2x2-T6',
-            'n_inputs': 4,
-            'n_outputs': 4,
-            'topas': (21,22,23,24,25,26,27,28),
-            },
-        10: {
-            'name': "4-Port Nuller (4x4 MMI) Passive Crazy",
-            'id': 'N4x4-D6',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (),
-            },
-        11: {
-            'name': "3-Port Kernel Nuller (passive)",
-            'id': 'N3x3-D5',
-            'n_inputs': 3,
-            'n_outputs': 3,
-            'topas': (),
-            },
-        12: {
-            'name': "4x4 MMI Passive",
-            'id': 'N4x4-T5',
-            'n_inputs': 4,
-            'n_outputs': 4,
-            'topas': (),
-            },
-        13: {
-            'name': "1x2 MMI Passive",
-            'id': 'MMI1x2-T4',
-            'n_inputs': 1,
-            'n_outputs': 2,
-            'topas': (),
-            },
-        14: {
-            'name': "Phase Actuator Solo",
-            'id': 'PM-T3',
-            'n_inputs': 1,
-            'n_outputs': 1,
-            'topas': (16),
-            },
-        15: {
-            'name': "Mega Kernel Nuller Reconfig",
-            'id': 'N2x2-D4',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (6,7,33,34,35,36,37,38,28,27,26,25,39,40),
-            },
-        16: {
-            'name': "Kernel Nuller 2x2 Reconfig N",
-            'id': 'N2x2-D3',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (29, 30, 31, 32),
-            },
-        17: {
-            'name': "Passive Kernel Nuller",
-            'id': 'N2x2-D2',
-            'n_inputs': 4,
-            'n_outputs': 7,
-            'topas': (),
-            },
-        18: {
-            'name': "3-Port Kernel Nuller",
-            'id': 'N3x3-D1',
-            'n_inputs': 3,
-            'n_outputs': 3,
-            'topas': (),
-            },
-        19: {
-            'name': "2x2 MMI",
-            'id': 'N4x4-T2',
-            'n_inputs': 4,
-            'n_outputs': 4,
-            'topas': (),
-            },
-        20: {
-            'name': "2x2 MMI",
-            'id': 'MMI2x2-T1',
-            'n_inputs': 2,
-            'n_outputs': 2,
-            'topas': (),
-            },
-    }
 
     xpow = _xpow
 
-    def __init__(self, arch: int):
+    def __init__(self, name: str, id: str, n_inputs: int, n_outputs: int, topas: tuple, number: int = None):
         """
-        Initialize a Arch instance for a specific architecture.
+        Initialize a Arch instance.
         
         Parameters
         ----------
-        arch : int
-            Architecture number (1-20). See ARCHS dictionary for available architectures.
-            
-        Raises
-        ------
-        ValueError
-            If the specified architecture number is invalid.
-            
-        Notes
-        -----
-        This method automatically creates PhaseShifter objects for all TOPAs in the
-        specified architecture and establishes serial connection to the XPOW controller.
+        name : str
+            Name of the architecture.
+        id : str
+            ID of the architecture.
+        n_inputs : int
+            Number of inputs.
+        n_outputs : int
+            Number of outputs.
+        topas : tuple
+            Tuple of TOPA channel numbers.
+        number : int, optional
+            Architecture number.
         """
-        if arch not in Arch.ARCHS:
-            raise ValueError(f"❌ Invalid architecture {arch}. Available architectures are: {list(Arch.ARCHS.keys())}")
-
-        self.name = self.ARCHS[arch]['name']
-        self.id = self.ARCHS[arch]['id']
-        self.number = arch
-        self.n_inputs = self.ARCHS[arch]['n_inputs']
-        self.n_outputs = self.ARCHS[arch]['n_outputs']
-        self.topas = self.ARCHS[arch]['topas']
+        self.name = name
+        self.id = id
+        self.number = number
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+        self.topas = topas
         
         # Create channel objects (list indexed from 0)
         self.channels = [PhaseShifter(channel_num) for channel_num in self.topas]
