@@ -41,7 +41,7 @@ mid_piston = [-1128]*4
 mid_piston = [-1150]*4
 piston_minmax = (-2520, 264)
 piston_minmax = (-2530, 230)
-active_seg = 2
+active_seg = 0
 off_tip = 3
 off_tilt = 0
 
@@ -62,18 +62,18 @@ neighbour_segs = []
 # neighbour_segs = neighbour_segs + [69, 70, 71, 72, 87, 102, 116, 128, 139, 149, 148, 147, 146, 135, 123, 110, 97, 83]
 # neighbour_segs = [i for i in range(169)]
 
-scan_neighbours = True
-date = '2025-12-03'
+scan_neighbours = False
+date = '2025-12-18'
 save_path0 = '/media/photonics/SSD 128Go/data/' + date + '/'
 
-tt_file = '/media/photonics/SSD 128Go/data/' + date + '/009/TT_config.json'
+tt_file = '/media/photonics/SSD 128Go/data/' + date + '/005/TT_config.json'
 
-crop_size = 10 # px window around the output
+crop_size = 7 # px window around the output
 crop_size2 = 180
-crop_centers = np.array([(320, 310),
-                        (353, 310),
-                        (386, 310),
-                        (418, 310),
+crop_centers = np.array([(285, 211),
+                    (317, 211),
+                    (350, 211),
+                    (382, 211),
                         (197, 346)])
 
 crop_coords = [((crop_centers[0,0]-crop_size//2, crop_centers[0,0]+crop_size//2+1), (crop_centers[0,1]-crop_size//2, crop_centers[0,1]+crop_size//2+1)), 
@@ -83,15 +83,15 @@ crop_coords = [((crop_centers[0,0]-crop_size//2, crop_centers[0,0]+crop_size//2+
 # crop_coords2 = [((crop_centers[4,0]-crop_size2//2, crop_centers[4,0]+crop_size2//2+1), (crop_centers[4,1]-crop_size2//2, crop_centers[4,1]+crop_size2//2+1))] 
 crop_coords2 = [((45,335), (210,475))] 
 
-crop_centers_noise = crop_centers.copy()
-crop_centers_noise[:,0] = crop_centers_noise[:,0] - (crop_size + 2)
-crop_coords_noise = [((crop_centers_noise[0,0]-crop_size//2, crop_centers_noise[0,0]+crop_size//2+1), (crop_centers_noise[0,1]-crop_size//2, crop_centers_noise[0,1]+crop_size//2+1)), 
-               ((crop_centers_noise[1,0]-crop_size//2, crop_centers_noise[1,0]+crop_size//2+1), (crop_centers_noise[1,1]-crop_size//2, crop_centers_noise[1,1]+crop_size//2+1)),
-               ((crop_centers_noise[2,0]-crop_size//2, crop_centers_noise[2,0]+crop_size//2+1), (crop_centers_noise[2,1]-crop_size//2, crop_centers_noise[2,1]+crop_size//2+1)),
-               ((crop_centers_noise[3,0]-crop_size//2, crop_centers_noise[3,0]+crop_size//2+1), (crop_centers_noise[3,1]-crop_size//2, crop_centers_noise[3,1]+crop_size//2+1))] # [((x1, x2), (y1, y2))]*4
+# crop_centers_noise = crop_centers.copy()
+# crop_centers_noise[:,0] = crop_centers_noise[:,0] - (crop_size + 2)
+# crop_coords_noise = [((crop_centers_noise[0,0]-crop_size//2, crop_centers_noise[0,0]+crop_size//2+1), (crop_centers_noise[0,1]-crop_size//2, crop_centers_noise[0,1]+crop_size//2+1)), 
+#                ((crop_centers_noise[1,0]-crop_size//2, crop_centers_noise[1,0]+crop_size//2+1), (crop_centers_noise[1,1]-crop_size//2, crop_centers_noise[1,1]+crop_size//2+1)),
+#                ((crop_centers_noise[2,0]-crop_size//2, crop_centers_noise[2,0]+crop_size//2+1), (crop_centers_noise[2,1]-crop_size//2, crop_centers_noise[2,1]+crop_size//2+1)),
+#                ((crop_centers_noise[3,0]-crop_size//2, crop_centers_noise[3,0]+crop_size//2+1), (crop_centers_noise[3,1]-crop_size//2, crop_centers_noise[3,1]+crop_size//2+1))] # [((x1, x2), (y1, y2))]*4
 
-# check_cropping(crop_coords)
-# check_cropping(crop_coords2)
+# check_cropping(crop_centers[:-1], crop_size)
+# check_cropping(crop_centers[-1:], crop_size2)
 # ppp
 
 piston_range, pstep = np.linspace(-2000, 100, 201, retstep=True)
@@ -158,7 +158,7 @@ for it in range(nloop):
     for p in tqdm(piston_range):
         cam.catch_up_with_sem(semid)    
         dark = dk.get_latest_data()
-      
+
         dm.segments[int(seg[active_seg,0])].set_ptt(p, seg[active_seg,2], seg[active_seg,3])
         if scan_neighbours:
             [dm.segments[neighbour].set_ptt(p, 0, 0) for neighbour in neighbour_segs]

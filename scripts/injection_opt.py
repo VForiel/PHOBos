@@ -35,7 +35,7 @@ def get_frame(cam, semid):
         Frame corrected from dark.
 
     """
-    img = cam.get_latest_data(semid)
+    img = cam.get_latest_data()
     
     return img
 
@@ -189,11 +189,10 @@ if __name__ == '__main__':
     
     ttamp = 3.
     wait_seg = 0.005
-    mid_piston = [-1128]*4
     mid_piston = [-1150]*4
     active_segs0 = [111, 112, 113, 114]
     active_segs0 = [135, 136, 137, 138]
-    save_path0 = '/media/photonics/SSD 128Go/data/2025-12-17/'
+    save_path0 = '/media/photonics/SSD 128Go/data/2025-12-18/'
     
     if not os.path.exists(save_path0):
         os.mkdir(save_path0)
@@ -203,10 +202,10 @@ if __name__ == '__main__':
     print('All seg flat')
     
     crop_size = 7 # px window around the output
-    crop_centers = np.array([(295, 200),
-                        (327, 200),
-                        (359, 200),
-                        (392, 200)])
+    crop_centers = np.array([(285, 211),
+                        (317, 211),
+                        (350, 211),
+                        (382, 211)])
     
     # check_cropping(crop_centers, crop_size)
     # ppp
