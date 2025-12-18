@@ -1757,17 +1757,21 @@ class Arch:
                     # Dense phase array for smooth fit curves
                     phase_dense = np.linspace(0, 2*np.pi, 200)
                     
-                    # Plot each output
+                    # Plot each output, using fit curve color for the data points when available
                     for out_idx in range(n_outputs):
-                        # Plot data points
-                        ax.plot(phases / np.pi, fluxes[:, out_idx], 'o', 
-                               markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
-                        
-                        # Plot fit if successful
+                        # Plot fit first if successful so we can reuse its color for the points
                         if fit_success[out_idx]:
                             fit_curve = sine_func(phase_dense, *fit_params[out_idx])
-                            ax.plot(phase_dense / np.pi, fit_curve, '-', 
-                                   linewidth=1.5, alpha=0.8)
+                            line, = ax.plot(phase_dense / np.pi, fit_curve, '-', 
+                                            linewidth=1.5, alpha=0.8)
+                            color = line.get_color()
+                            # Plot data points with the same color as the fit
+                            ax.plot(phases / np.pi, fluxes[:, out_idx], 'o', 
+                                   markersize=3, label=f'Out {out_idx+1}', alpha=0.6, color=color)
+                        else:
+                            # No fit: plot points with default color
+                            ax.plot(phases / np.pi, fluxes[:, out_idx], 'o', 
+                                   markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
                     
                     # Labels and title
                     ax.set_xlabel("Phase (π rad)", fontsize=9)
@@ -1856,23 +1860,26 @@ class Arch:
                     # Dense phase array for smooth fit curves
                     phase_dense = np.linspace(0, 2*np.pi, 200)
                     
-                    # Plot each output (centered and normalized)
+                    # Plot each output (centered and normalized), matching point color to fit when available
                     for out_idx in range(n_outputs):
                         # Subtract mean and normalize by max amplitude
                         flux_centered = fluxes[:, out_idx] - np.mean(fluxes[:, out_idx])
                         flux_normalized = flux_centered / max_amplitude if max_amplitude > 0 else flux_centered
-                        
-                        # Plot normalized data points
-                        ax.plot(phases / np.pi, flux_normalized, 'o', 
-                               markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
-                        
-                        # Plot normalized fit if successful
+
+                        # If fit succeeded, plot fit first to capture its color, then plot points with that color
                         if fit_success[out_idx]:
                             fit_curve = sine_func(phase_dense, *fit_params[out_idx])
                             fit_curve_centered = fit_curve - np.mean(sine_func(phases, *fit_params[out_idx]))
                             fit_curve_normalized = fit_curve_centered / max_amplitude if max_amplitude > 0 else fit_curve_centered
-                            ax.plot(phase_dense / np.pi, fit_curve_normalized, '-', 
-                                   linewidth=1.5, alpha=0.8)
+                            line, = ax.plot(phase_dense / np.pi, fit_curve_normalized, '-', 
+                                            linewidth=1.5, alpha=0.8)
+                            color = line.get_color()
+                            ax.plot(phases / np.pi, flux_normalized, 'o', 
+                                   markersize=3, label=f'Out {out_idx+1}', alpha=0.6, color=color)
+                        else:
+                            # No fit: plot normalized points with default color
+                            ax.plot(phases / np.pi, flux_normalized, 'o', 
+                                   markersize=3, label=f'Out {out_idx+1}', alpha=0.6)
                     
                     # Labels and title
                     ax.set_xlabel("Phase (π rad)", fontsize=9)
