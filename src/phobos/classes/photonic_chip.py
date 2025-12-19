@@ -264,7 +264,7 @@ class PhaseShifter:
     
     xpow = _xpow
 
-    def __init__(self, channel_number: int):
+    def __init__(self, channel_number: int, calibrate: bool = True):
         """
         Initialize a PhaseShifter instance.
         
@@ -276,6 +276,8 @@ class PhaseShifter:
         if not (1 <= channel_number <= XPOW.N_CHANNELS):
             raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOW.N_CHANNELS}.")
         self.channel = channel_number
+
+        self.calibrate()
         
     def set_current(self, current: float, verbose: bool = False):
         """
@@ -446,7 +448,7 @@ class PhaseShifter:
         
         return power
     
-    def calibrate(self, verbose: bool = False):
+    def calibrate(self, verbose: bool = False, plot: bool = False):
         """
         Calibrate power correction coefficient for this channel using 2-point measurement.
         
@@ -458,6 +460,8 @@ class PhaseShifter:
         ----------
         verbose : bool, optional
             If True, print calibration details. Default is False.
+        plot : bool, optional
+            If True, display before/after calibration comparison plots. Default is False.
             
         Notes
         -----
@@ -478,7 +482,50 @@ class PhaseShifter:
         """
         if verbose:
             print(f"🔧 Calibrating channel {self.channel} using 2-point measurement...")
+
+        # Reset power correction before calibration
+        _xpow.POWER_CORRECTION[self.channel - 1] = None
         
+        # ========== BEFORE CALIBRATION SCANS ==========
+        if plot:
+            import matplotlib.pyplot as plt
+            
+            # Current scan (before)
+            self.set_voltage(1.0, verbose=verbose)
+            i_ramp = np.linspace(0, 30, 20)  # mA
+            i_meas_before = []
+            v_meas_before = []
+            p_meas_before = []
+            for i in i_ramp:
+                self.set_current(i, verbose=False)
+                i_meas_before.append(self.get_current(verbose=False))
+                v_meas_before.append(self.get_voltage(verbose=False))
+                p_meas_before.append(self.get_power(verbose=False))
+            
+            # Voltage scan (before)
+            self.set_current(300.0, verbose=verbose)
+            v_ramp = np.linspace(0, 30, 20)  # V
+            i_meas_v_before = []
+            v_meas_v_before = []
+            p_meas_v_before = []
+            for v in v_ramp:
+                self.set_voltage(v, verbose=False)
+                i_meas_v_before.append(self.get_current(verbose=False))
+                v_meas_v_before.append(self.get_voltage(verbose=False))
+                p_meas_v_before.append(self.get_power(verbose=False))
+            
+            # Power scan (before)
+            p_ramp = np.linspace(0, 1, 20)  # W
+            i_meas_p_before = []
+            v_meas_p_before = []
+            p_meas_p_before = []
+            for p in p_ramp:
+                self.set_power(p, verbose=False)
+                i_meas_p_before.append(self.get_current(verbose=False))
+                v_meas_p_before.append(self.get_voltage(verbose=False))
+                p_meas_p_before.append(self.get_power(verbose=False))
+        
+        # ========== CALIBRATION ==========
         # Set fixed current at 300 mA
         self.set_current(300.0, verbose=verbose)
         
@@ -507,6 +554,122 @@ class PhaseShifter:
         
         if verbose:
             print(f"✅ Channel {self.channel} calibrated: slope={slope:.6f}")
+        
+        # ========== AFTER CALIBRATION SCANS ==========
+        if plot:
+            # Current scan (after)
+            self.set_voltage(1.0, verbose=verbose)
+            i_meas_after = []
+            v_meas_after = []
+            p_meas_after = []
+            for i in i_ramp:
+                self.set_current(i, verbose=False)
+                i_meas_after.append(self.get_current(verbose=False))
+                v_meas_after.append(self.get_voltage(verbose=False))
+                p_meas_after.append(self.get_power(verbose=False))
+            
+            # Voltage scan (after)
+            self.set_current(300.0, verbose=verbose)
+            i_meas_v_after = []
+            v_meas_v_after = []
+            p_meas_v_after = []
+            for v in v_ramp:
+                self.set_voltage(v, verbose=False)
+                i_meas_v_after.append(self.get_current(verbose=False))
+                v_meas_v_after.append(self.get_voltage(verbose=False))
+                p_meas_v_after.append(self.get_power(verbose=False))
+            
+            # Power scan (after)
+            i_meas_p_after = []
+            v_meas_p_after = []
+            p_meas_p_after = []
+            for p in p_ramp:
+                self.set_power(p, verbose=False)
+                i_meas_p_after.append(self.get_current(verbose=False))
+                v_meas_p_after.append(self.get_voltage(verbose=False))
+                p_meas_p_after.append(self.get_power(verbose=False))
+            
+            # ========== PLOTTING ==========
+            fig, axs = plt.subplots(3, 3, figsize=(15, 12))
+            
+            # Row 0: Current scan
+            axs[0, 0].plot(i_ramp, i_meas_before, 'o-', label='Before', alpha=0.7)
+            axs[0, 0].plot(i_ramp, i_meas_after, 's-', label='After', alpha=0.7)
+            axs[0, 0].set_xlabel('Set Current (mA)')
+            axs[0, 0].set_ylabel('Measured Current (mA)')
+            axs[0, 0].set_title('Current Scan - Current')
+            axs[0, 0].grid(True)
+            axs[0, 0].legend()
+            
+            axs[0, 1].plot(i_ramp, v_meas_before, 'o-', label='Before', alpha=0.7)
+            axs[0, 1].plot(i_ramp, v_meas_after, 's-', label='After', alpha=0.7)
+            axs[0, 1].set_xlabel('Set Current (mA)')
+            axs[0, 1].set_ylabel('Measured Voltage (V)')
+            axs[0, 1].set_title('Current Scan - Voltage')
+            axs[0, 1].grid(True)
+            axs[0, 1].legend()
+            
+            axs[0, 2].plot(i_ramp, p_meas_before, 'o-', label='Before', alpha=0.7)
+            axs[0, 2].plot(i_ramp, p_meas_after, 's-', label='After', alpha=0.7)
+            axs[0, 2].set_xlabel('Set Current (mA)')
+            axs[0, 2].set_ylabel('Measured Power (W)')
+            axs[0, 2].set_title('Current Scan - Power')
+            axs[0, 2].grid(True)
+            axs[0, 2].legend()
+            
+            # Row 1: Voltage scan
+            axs[1, 0].plot(v_ramp, i_meas_v_before, 'o-', label='Before', alpha=0.7)
+            axs[1, 0].plot(v_ramp, i_meas_v_after, 's-', label='After', alpha=0.7)
+            axs[1, 0].set_xlabel('Set Voltage (V)')
+            axs[1, 0].set_ylabel('Measured Current (mA)')
+            axs[1, 0].set_title('Voltage Scan - Current')
+            axs[1, 0].grid(True)
+            axs[1, 0].legend()
+            
+            axs[1, 1].plot(v_ramp, v_meas_v_before, 'o-', label='Before', alpha=0.7)
+            axs[1, 1].plot(v_ramp, v_meas_v_after, 's-', label='After', alpha=0.7)
+            axs[1, 1].set_xlabel('Set Voltage (V)')
+            axs[1, 1].set_ylabel('Measured Voltage (V)')
+            axs[1, 1].set_title('Voltage Scan - Voltage')
+            axs[1, 1].grid(True)
+            axs[1, 1].legend()
+            
+            axs[1, 2].plot(v_ramp, p_meas_v_before, 'o-', label='Before', alpha=0.7)
+            axs[1, 2].plot(v_ramp, p_meas_v_after, 's-', label='After', alpha=0.7)
+            axs[1, 2].set_xlabel('Set Voltage (V)')
+            axs[1, 2].set_ylabel('Measured Power (W)')
+            axs[1, 2].set_title('Voltage Scan - Power')
+            axs[1, 2].grid(True)
+            axs[1, 2].legend()
+            
+            # Row 2: Power scan
+            axs[2, 0].plot(p_ramp, i_meas_p_before, 'o-', label='Before', alpha=0.7)
+            axs[2, 0].plot(p_ramp, i_meas_p_after, 's-', label='After', alpha=0.7)
+            axs[2, 0].set_xlabel('Set Power (W)')
+            axs[2, 0].set_ylabel('Measured Current (mA)')
+            axs[2, 0].set_title('Power Scan - Current')
+            axs[2, 0].grid(True)
+            axs[2, 0].legend()
+            
+            axs[2, 1].plot(p_ramp, v_meas_p_before, 'o-', label='Before', alpha=0.7)
+            axs[2, 1].plot(p_ramp, v_meas_p_after, 's-', label='After', alpha=0.7)
+            axs[2, 1].set_xlabel('Set Power (W)')
+            axs[2, 1].set_ylabel('Measured Voltage (V)')
+            axs[2, 1].set_title('Power Scan - Voltage')
+            axs[2, 1].grid(True)
+            axs[2, 1].legend()
+            
+            axs[2, 2].plot(p_ramp, p_meas_p_before, 'o-', label='Before', alpha=0.7)
+            axs[2, 2].plot(p_ramp, p_meas_p_after, 's-', label='After', alpha=0.7)
+            axs[2, 2].set_xlabel('Set Power (W)')
+            axs[2, 2].set_ylabel('Measured Power (W)')
+            axs[2, 2].set_title('Power Scan - Power')
+            axs[2, 2].grid(True)
+            axs[2, 2].legend()
+            
+            plt.suptitle(f'Channel {self.channel} Calibration Comparison', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            plt.show()
         
         # Turn off channel after calibration
         self.turn_off(verbose=verbose)
