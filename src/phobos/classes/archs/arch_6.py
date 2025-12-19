@@ -29,7 +29,6 @@ class Arch6(Arch):
 
     def null_calibration_gen(
         self,
-        dm_object,
         cred3_object,
         crop_centers,
         crop_sizes=10,
@@ -47,8 +46,6 @@ class Arch6(Arch):
         
         Parameters
         ----------
-        dm_object : DM
-            Deformable mirror instance.
         cred3_object : Cred3
             Camera instance.
         crop_centers : array-like

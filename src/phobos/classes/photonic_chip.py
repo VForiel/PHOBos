@@ -1270,6 +1270,9 @@ class Arch:
         # Define the fitting function: (A + F*P) * sin(B * P + C) + D * P + E
         def sine_func(x, A, B, C, D, E, F):
             return (A + F * x) * np.sin(B * x + C) + D * x + E
+
+        def sine_func(x, A, B, C, D, E):
+            return A * np.sin(2*np.pi/B * x + C) + D * x + E
             
         if verbose:
             print(f"🔧 Calibrating phase for {len(self.channels)} channels...")
@@ -1338,22 +1341,40 @@ class Arch:
                 # D: 0
                 # E: mean
                 # F: 0
-                p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data), 0]
+                p0 = [(np.max(y_data)-np.min(y_data))/2, 11, 0, 0, np.mean(y_data), 0]
+
+                p0 = [(np.max(y_data)-np.min(y_data))/2, 0.6, 0, 0, np.mean(y_data)]
+
+                bounds_min = [0,      0,  0,      -np.inf, 0,     -np.inf]
+                bounds_max = [np.inf, 20, 2*np.pi, np.inf, np.inf, np.inf]
+
+                bounds_min = [0,      0.5,-np.pi,-np.inf,-np.inf]
+                bounds_max = [np.inf, 1  , np.pi, np.inf, np.inf]
                 
                 try:
-                    from scipy.optimize import minimize
+
+                    method = 'curve_fit'
+
+                    if method == 'minimize':
+                        from scipy.optimize import minimize
+                        
+                        # Define residual function for minimize
+                        def residual(params):
+                            return np.sum((y_data - sine_func(power_range, *params))**2)
+                        
+                        # Use minimize with robust method
+                        result = minimize(residual, p0, bounds=np.array((bounds_min, bounds_max)).T)
+                        popt = result.x
+
+                    elif method == 'curve_fit':
+                        from scipy.optimize import curve_fit
+                        popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, bounds=(bounds_min, bounds_max))
                     
-                    # Define residual function for minimize
-                    def residual(params):
-                        return np.sum((y_data - sine_func(power_range, *params))**2)
-                    
-                    # Use minimize with robust method
-                    result = minimize(residual, p0, method='L-BFGS-B', 
-                                    options={'maxiter': 10000, 'ftol': 1e-9})
-                    popt = result.x
-                    
-                    A, B, C, D, E, F = popt
-                    period = 2 * np.pi / np.abs(B)
+                    # A, B, C, D, E, F = popt
+                    A, B, C, D, E = popt
+
+                    #period = 2 * np.pi / np.abs(B)
+                    period = B
                     periods.append(period)
 
                     if verbose:
