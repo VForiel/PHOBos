@@ -1409,6 +1409,74 @@ class Arch:
             for j in range(len(self.channels), len(axs)):
                 axs[j].axis('off')
             
+            # ========== SECOND FIGURE: PHASE SCAN (0 to 2π) ==========
+            if verbose:
+                print("📊 Performing phase scan (0 to 2π) for verification...")
+            
+            phase_range = np.linspace(0, 2*np.pi, samples)
+            
+            fig2, axs2 = plt.subplots(rows, cols, figsize=(4*cols, 3*rows), constrained_layout=True)
+            fig2.suptitle(f"Phase Scan Verification (0 to 2π) - {self.name}")
+            if n_channels > 1:
+                axs2 = np.atleast_1d(axs2).flatten()
+            else:
+                axs2 = [axs2]
+            
+            for idx, channel in enumerate(self.channels):
+                # Turn off all channels first
+                self.turn_off(verbose=False)
+                
+                if verbose:
+                    print(f"  - Scanning phase for channel {channel.channel}...")
+                
+                fluxes_phase = []
+                
+                # Scan phase from 0 to 2π
+                for phase in phase_range:
+                    channel.set_phase(phase)
+                    
+                    # Get outputs
+                    outs = cred3_object.get_outputs(crop_centers=crop_centers, crop_sizes=crop_sizes)
+                    fluxes_phase.append(outs)
+                
+                fluxes_phase = np.array(fluxes_phase)  # Shape (n_samples, n_outputs)
+                
+                # Calculate amplitudes to filter out unaffected outputs
+                amplitudes_phase = np.ptp(fluxes_phase, axis=0)
+                max_amp_phase = np.max(amplitudes_phase) if len(amplitudes_phase) > 0 else 0
+                threshold_phase = max_amp_phase / 10.0
+                
+                # Plot phase scan
+                ax2 = axs2[idx]
+                ax2.set_title(f"Channel {channel.channel}")
+                ax2.set_xlabel("Phase (rad)")
+                ax2.set_ylabel("Flux")
+                ax2.grid(True)
+                
+                # Add vertical lines at 0, π, 2π for reference
+                ax2.axvline(0, color='gray', linestyle='--', alpha=0.3, linewidth=0.8)
+                ax2.axvline(np.pi, color='gray', linestyle='--', alpha=0.3, linewidth=0.8)
+                ax2.axvline(2*np.pi, color='gray', linestyle='--', alpha=0.3, linewidth=0.8)
+                
+                for i in range(fluxes_phase.shape[1]):
+                    if amplitudes_phase[i] < threshold_phase:
+                        # Skip outputs that are not affected by this shifter
+                        continue
+                    
+                    y_data_phase = fluxes_phase[:, i]
+                    ax2.plot(phase_range, y_data_phase, 'o-', label=f'Out {i}', alpha=0.7)
+                
+                ax2.legend(fontsize='small')
+                
+                # Turn off channel before next
+                channel.turn_off()
+            
+            # Hide unused subplots in second figure
+            for j in range(len(self.channels), len(axs2)):
+                axs2[j].axis('off')
+            
+            plt.show()
+            
         if verbose:
             print("✅ Phase calibration completed.")
 
