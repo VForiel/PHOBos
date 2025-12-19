@@ -27,7 +27,7 @@ class Arch15(Arch):
             number=15
         )
     
-    def calibrate_obs(
+    def null_calibration_obs(
         self,
         dm_object,
         cred3_object,
@@ -76,7 +76,7 @@ class Arch15(Arch):
         - Shifters 11, 13, 14 minimize kernel outputs
         - If polychromatic: shifters [1,2], [3,4], [5,7] for achromatic bright control
         
-        The method scans each shifter from 0 to 2π (or λ in length units), fits a sinusoid,
+        The method scans each shifter from 0 to 2π, fits a sinusoid,
         and sets the optimal phase for maximum/minimum transmission.
         
         Examples
@@ -96,13 +96,10 @@ class Arch15(Arch):
         if len(crop_centers) != 7:
             raise ValueError(f"❌ Architecture 15 expects 7 output spots, got {len(crop_centers)}")
         
-        # Wavelength for phase scanning (assume 1550 nm for photonics)
-        λ = 1550.0  # nm
-        
         if plot and plt is not None:
             _, axs = plt.subplots(6, 3, figsize=figsize, constrained_layout=True)
             for i in range(7):
-                axs.flatten()[i].set_xlabel("Phase shift (nm)")
+                axs.flatten()[i].set_xlabel("Phase shift (rad)")
                 axs.flatten()[i].set_ylabel("Throughput (normalized)")
         
         def maximize_bright(shifter_indices, plt_coords=None):
@@ -118,16 +115,16 @@ class Arch15(Arch):
                 initial_phases = [ch.get_phase() for ch in shifters]
                 Δφ = initial_phases[1] - initial_phases[0] if len(initial_phases) > 1 else 0
             
-            x = np.linspace(0, λ, n)
+            x = np.linspace(0, 2 * np.pi, n)
             y = np.empty(n)
             
             for i in range(n):
                 # Set phase for primary shifter
-                shifters[0].set_phase(2 * np.pi * x[i] / λ)
+                shifters[0].set_phase(x[i])
                 
                 # If multiple shifters, maintain phase difference
                 if len(shifters) > 1:
-                    shifters[1].set_phase(2 * np.pi * x[i] / λ + Δφ)
+                    shifters[1].set_phase(x[i] + Δφ)
                 
                 # Measure bright output (index 0)
                 temp_outs = []
@@ -141,23 +138,23 @@ class Arch15(Arch):
             
             # Fit sinusoid
             def sin_model(x, x0):
-                return (np.sin((x - x0) / λ * 2 * np.pi) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
+                return (np.sin(x - x0) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
             
             popt = scipy.optimize.minimize(lambda x0: np.sum((y - sin_model(x, x0)) ** 2), x0=[0], method='Nelder-Mead').x
             
             # Set optimal phase (π/2 shift for maximum)
-            optimal_phase = np.mod(popt[0] + λ / 4, λ)
-            shifters[0].set_phase(2 * np.pi * optimal_phase / λ)
+            optimal_phase = np.mod(popt[0] + np.pi / 2, 2 * np.pi)
+            shifters[0].set_phase(optimal_phase)
             
             if len(shifters) > 1:
-                shifters[1].set_phase(2 * np.pi * optimal_phase / λ + Δφ)
+                shifters[1].set_phase(optimal_phase + Δφ)
             
             if plot and plt is not None and plt_coords is not None:
                 axs[plt_coords].set_title(f"Bright (shifter {'s' if len(shifter_indices) > 1 else ''} {shifter_indices})")
                 axs[plt_coords].scatter(x, y, label='Data', color='tab:blue', s=1)
                 axs[plt_coords].plot(x, sin_model(x, *popt), label='Fit', color='tab:orange')
                 axs[plt_coords].axvline(x=optimal_phase, color='k', linestyle='--', label='Optimal')
-                axs[plt_coords].set_xlabel("Phase shift (nm)")
+                axs[plt_coords].set_xlabel("Phase shift (rad)")
                 axs[plt_coords].set_ylabel("Bright throughput")
                 axs[plt_coords].legend()
         
@@ -165,11 +162,11 @@ class Arch15(Arch):
             """Minimize kernel output by scanning a shifter."""
             shifter = self.channels[shifter_idx - 1]
             
-            x = np.linspace(0, λ, n)
+            x = np.linspace(0, 2 * np.pi, n)
             y = np.empty(n)
             
             for i in range(n):
-                shifter.set_phase(2 * np.pi * x[i] / λ)
+                shifter.set_phase(x[i])
                 
                 # Measure outputs and compute kernel
                 temp_outs = []
@@ -192,20 +189,20 @@ class Arch15(Arch):
             
             # Fit sinusoid
             def sin_model(x, x0):
-                return (np.sin((x - x0) / λ * 2 * np.pi) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
+                return (np.sin(x - x0) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
             
             popt = scipy.optimize.minimize(lambda x0: np.sum((y - sin_model(x, x0)) ** 2), x0=[0], method='Nelder-Mead').x
             
             # Set optimal phase (minimum)
-            optimal_phase = np.mod(popt[0], λ)
-            shifter.set_phase(2 * np.pi * optimal_phase / λ)
+            optimal_phase = np.mod(popt[0] + 3*np.pi/2, 2 * np.pi) # Min of sin(x-x0) is at x = x0 + 3pi/2
+            shifter.set_phase(optimal_phase)
             
             if plot and plt is not None and plt_coords is not None:
                 axs[plt_coords].set_title(f"Kernel {kernel_idx} (shifter {shifter_idx})")
                 axs[plt_coords].scatter(x, y, label='Data', color='tab:blue', s=1)
                 axs[plt_coords].plot(x, sin_model(x, *popt), label='Fit', color='tab:orange')
                 axs[plt_coords].axvline(x=optimal_phase, color='k', linestyle='--', label='Optimal')
-                axs[plt_coords].set_xlabel("Phase shift (nm)")
+                axs[plt_coords].set_xlabel("Phase shift (rad)")
                 axs[plt_coords].set_ylabel(f"K{kernel_idx} throughput")
                 axs[plt_coords].legend()
         
@@ -213,11 +210,11 @@ class Arch15(Arch):
             """Maximize sum of dark pair outputs."""
             shifter = self.channels[shifter_idx - 1]
             
-            x = np.linspace(0, λ, n)
+            x = np.linspace(0, 2 * np.pi, n)
             y = np.empty(n)
             
             for i in range(n):
-                shifter.set_phase(2 * np.pi * x[i] / λ)
+                shifter.set_phase(x[i])
                 
                 # Measure dark pair sum
                 temp_outs = []
@@ -233,20 +230,20 @@ class Arch15(Arch):
             
             # Fit sinusoid
             def sin_model(x, x0):
-                return (np.sin((x - x0) / λ * 2 * np.pi) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
+                return (np.sin(x - x0) + 1) / 2 * (np.max(y) - np.min(y)) + np.min(y)
             
             popt = scipy.optimize.minimize(lambda x0: np.sum((y - sin_model(x, x0)) ** 2), x0=[0], method='Nelder-Mead').x
             
             # Set optimal phase (π/2 shift for maximum)
-            optimal_phase = np.mod(popt[0] + λ / 4, λ)
-            shifter.set_phase(2 * np.pi * optimal_phase / λ)
+            optimal_phase = np.mod(popt[0] + np.pi / 2, 2 * np.pi)
+            shifter.set_phase(optimal_phase)
             
             if plot and plt is not None and plt_coords is not None:
                 axs[plt_coords].set_title(f"Darks {dark_indices} (shifter {shifter_idx})")
                 axs[plt_coords].scatter(x, y, label='Data', color='tab:blue', s=1)
                 axs[plt_coords].plot(x, sin_model(x, *popt), label='Fit', color='tab:orange')
                 axs[plt_coords].axvline(x=optimal_phase, color='k', linestyle='--', label='Optimal')
-                axs[plt_coords].set_xlabel("Phase shift (nm)")
+                axs[plt_coords].set_xlabel("Phase shift (rad)")
                 axs[plt_coords].set_ylabel(f"Dark pair throughput")
                 axs[plt_coords].legend()
         
@@ -304,3 +301,197 @@ class Arch15(Arch):
             plt.show()
         
         print("✅ Architecture 15 calibration complete!")
+
+    def null_calibration_gen(
+        self,
+        dm_object,
+        cred3_object,
+        crop_centers,
+        crop_sizes=10,
+        beta: float = 0.8,
+        verbose: bool = False,
+        plot: bool = False,
+        figsize: tuple = (10, 10),
+        save_as=None,
+    ) -> dict:
+        """
+        Optimize phase shifter offsets to maximize nulling performance using a genetic-like gradient descent.
+        
+        Adaptation of Context.calibrate_gen from PHISE.
+        
+        Parameters
+        ----------
+        dm_object : DM
+            Deformable mirror (kept for interface consistency, not explicitly used in loop unless needed).
+        cred3_object : Cred3
+            Camera instance.
+        crop_centers : array-like
+            Output spot centers.
+        crop_sizes : int
+            Crop window size.
+        beta : float
+            Decay factor for the step size (0.5 <= beta < 1).
+        verbose : bool
+            If True, print optimization progress.
+        plot : bool
+            If True, plot the optimization process.
+        figsize : tuple
+            Figure size for plots.
+        save_as : str
+            Path to save the plot if plot is True.
+            
+        Returns
+        -------
+        dict
+            Dictionary with optimization history (depth, shifters).
+        """
+
+        if beta < 0.5 or beta >= 1:
+            raise ValueError("Beta must be in the range [0.5, 1[")
+        
+        # Initial step size
+        ε = 1e-4 # Minimum shift step size in radians
+        Δφ = np.pi / 2 # Initial step
+        
+        # Shifters that contribute to redirecting light to the bright output
+        φb = [1, 2, 3, 4, 5, 7]
+        
+        # Shifters that contribute to the symmetry of the dark outputs
+        φk = [6, 8, 9, 10, 11, 12, 13, 14]
+        
+        # History
+        depth_history = []
+        shifters_history = []
+        
+        # Cache current phases to avoid repeated hardware calls
+        current_phases = [ch.get_phase() for ch in self.channels]
+        
+        def get_metrics_from_cam():
+            outs = cred3_object.get_outputs(crop_centers=crop_centers, crop_sizes=crop_sizes)
+            # outs: [Bright, D1, D2, D3, D4, D5, D6]
+            b = outs[0]
+            
+            # Kernels: K1 = D1 - D2, K2 = D3 - D4, K3 = D5 - D6
+            k1 = outs[1] - outs[2]
+            k2 = outs[3] - outs[4]
+            k3 = outs[5] - outs[6]
+            
+            # Metric for kernel nulling: mean of absolute kernels
+            k_metric = (np.abs(k1) + np.abs(k2) + np.abs(k3)) / 3.0
+            return b, k_metric
+            
+        print("🧬 Starting Genetic Calibration...")
+        
+        iteration_count = 0
+        
+        while Δφ > ε:
+            if verbose:
+                print(f"--- Iteration {iteration_count} --- Δφ={Δφ:.2e}")
+            
+            for i in φb + φk:
+                # i is 1-based index
+                shifter = self.channels[i - 1]
+                
+                log = ""
+                
+                # Measure current state
+                b_old, k_old = get_metrics_from_cam()
+                
+                # Get current phase from cache
+                current_phase = current_phases[i - 1]
+                
+                # Positive step
+                shifter.set_phase((current_phase + Δφ) % (2 * np.pi))
+                b_pos, k_pos = get_metrics_from_cam()
+                
+                # Negative step
+                shifter.set_phase((current_phase - Δφ) % (2 * np.pi))
+                b_neg, k_neg = get_metrics_from_cam()
+                
+                # Restore original position (for now, will update if better)
+                shifter.set_phase(current_phase)
+                
+                # Metrics for history
+                depth = k_old / b_old if b_old > 0 else 0
+                depth_history.append(depth)
+                shifters_history.append(list(current_phases))
+                
+                # Decision logic
+                updated = False
+                
+                # Group 1: Maximize Bright
+                if i in φb:
+                    log += f"Shift {i} Bright: {b_neg:.2e} | {b_old:.2e} | {b_pos:.2e} -> "
+                    
+                    if b_pos > b_old and b_pos > b_neg:
+                        log += " + "
+                        new_phase = (current_phase + Δφ) % (2 * np.pi)
+                        shifter.set_phase(new_phase)
+                        current_phases[i - 1] = new_phase
+                        updated = True
+                    elif b_neg > b_old and b_neg > b_pos:
+                        log += " - "
+                        new_phase = (current_phase - Δφ) % (2 * np.pi)
+                        shifter.set_phase(new_phase)
+                        current_phases[i - 1] = new_phase
+                        updated = True
+                    else:
+                        log += " = "
+                
+                # Group 2: Minimize Kernel
+                else: # i in φk
+                    log += f"Shift {i} Kernel: {k_neg:.2e} | {k_old:.2e} | {k_pos:.2e} -> "
+                    
+                    if k_pos < k_old and k_pos < k_neg:
+                        log += " + "
+                        new_phase = (current_phase + Δφ) % (2 * np.pi)
+                        shifter.set_phase(new_phase)
+                        current_phases[i - 1] = new_phase
+                        updated = True
+                    elif k_neg < k_old and k_neg < k_pos:
+                        log += " - "
+                        new_phase = (current_phase - Δφ) % (2 * np.pi)
+                        shifter.set_phase(new_phase)
+                        current_phases[i - 1] = new_phase
+                        updated = True
+                    else:
+                        log += " = "
+                        
+                if verbose:
+                    print(log)
+            
+            # Decay step size
+            Δφ *= beta
+            iteration_count += 1
+            
+        print(f"✅ Genetic calibration complete in {iteration_count} iterations.")
+        
+        if plot and plt is not None:
+            shifters_hist_arr = np.array(shifters_history)
+            
+            _, axs = plt.subplots(2, 1, figsize=figsize, constrained_layout=True)
+            
+            axs[0].plot(depth_history)
+            axs[0].set_xlabel("Steps")
+            axs[0].set_ylabel("Kernel-Null depth (K/B)")
+            axs[0].set_yscale("log")
+            axs[0].set_title("Performance of the Kernel-Nuller")
+            
+            for i in range(shifters_hist_arr.shape[1]):
+                # Only plot active shifters? Or all? Let's plot all.
+                axs[1].plot(shifters_hist_arr[:, i], label=f"Ch {i+1}")
+            
+            axs[1].set_xlabel("Steps")
+            axs[1].set_ylabel("Phase shift (rad)")
+            axs[1].set_title("Convergence of phase shifters")
+            # axs[1].legend(loc='upper right', bbox_to_anchor=(1,1), fontsize='small', ncol=2)
+            
+            if save_as:
+                plt.savefig(save_as, dpi=150, bbox_inches='tight')
+            plt.show()
+            
+        return {
+            "depth": np.array(depth_history),
+            "shifters": np.array(shifters_history)
+        }
+
