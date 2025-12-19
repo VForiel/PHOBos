@@ -1268,8 +1268,8 @@ class Arch:
         power_range = np.linspace(0, 1, samples)
         
         # Define the fitting function: (A + F*P) * sin(B * P + C) + D * P + E
-        def sine_func(x, A, B, C, D, E, F):
-            return (A + F * x) * np.sin(B * x + C) + D * x + E
+        # def sine_func(x, A, B, C, D, E, F):
+        #     return (A + F * x) * np.sin(B * x + C) + D * x + E
 
         def sine_func(x, A, B, C, D, E):
             return A * np.sin(2*np.pi/B * x + C) + D * x + E
@@ -1290,6 +1290,7 @@ class Arch:
             else:
                 axs = [axs]
 
+        out_fluxes = []
         for idx, channel in enumerate(self.channels):
 
             # Turn off all channels first
@@ -1309,6 +1310,7 @@ class Arch:
                 fluxes.append(outs)
             
             fluxes = np.array(fluxes) # Shape (n_samples, n_outputs)
+            out_fluxes.append(fluxes)
             
             # Calculate amplitudes to filter out unaffected outputs
             amplitudes = np.ptp(fluxes, axis=0)
@@ -1363,12 +1365,12 @@ class Arch:
                             return np.sum((y_data - sine_func(power_range, *params))**2)
                         
                         # Use minimize with robust method
-                        result = minimize(residual, p0, bounds=np.array((bounds_min, bounds_max)).T)
+                        result = minimize(residual, p0, bounds=np.array((bounds_min, bounds_max)).T, options={'maxiter':10000})
                         popt = result.x
 
                     elif method == 'curve_fit':
                         from scipy.optimize import curve_fit
-                        popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, bounds=(bounds_min, bounds_max))
+                        popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, bounds=(bounds_min, bounds_max), maxfev = 10000)
                     
                     # A, B, C, D, E, F = popt
                     A, B, C, D, E = popt
@@ -1488,6 +1490,8 @@ class Arch:
             
         if verbose:
             print("✅ Phase calibration completed.")
+
+        return np.array(out_fluxes)
 
     def characterize(self, dm_object, cred3_object, crop_centers, crop_sizes=10, 
                     phase_samples=51, n_averages=10, plot=True, verbose=True):
