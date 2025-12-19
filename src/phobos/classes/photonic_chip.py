@@ -77,6 +77,17 @@ class XPOW:
             cls._instance = super(XPOW, cls).__new__(cls)
         return cls._instance
     
+    def __getattr__(self, name):
+        """Handle deprecated method calls with warnings."""
+        if name == 'update_all_coeffs':
+            warnings.warn(
+                "update_all_coeffs() is deprecated and no longer needed. DAC calibration is handled by dac_calibration().",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return lambda plot=False, verbose=False: print(f"⚠️  update_all_coeffs() is deprecated and does nothing.") if verbose else None
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+    
     def connect(self):
         """
         Establish serial connection to the XPOW controller.
@@ -172,40 +183,48 @@ class XPOW:
             return None
     
     @staticmethod
-    def update_all_coeffs(plot: bool = False, verbose: bool = False):
+    def dac_calibration(plot: bool = False, verbose: bool = False):
         """
-        Calibrate correction coefficients for ALL 40 XPOW channels.
+        Calibrate DAC power correction coefficients for all 40 XPOW channels.
         
-        Scans current and voltage for every channel, queries measured values,
-        and refines CUR_CORRECTION and VOLT_CORRECTION for all channels.
+        This method performs 2-point power measurements on every channel to compute
+        the slope coefficients used for accurate power control. Each channel is
+        calibrated independently.
         
         Parameters
         ----------
         plot : bool, optional
-            If True, display fit results for visual inspection. Default is False.
+            If True, display calibration comparison plots for each channel. Default is False.
         verbose : bool, optional
-            If True, print calibration details. Default is False.
+            If True, print calibration details for each channel. Default is False.
             
         Notes
         -----
-        This method updates all 40 channels. For calibrating only specific chip
-        channels, use Arch.update_coeffs() instead. For a single channel, use
-        PhaseShifter.update_coeff().
+        This method calibrates all 40 channels. For calibrating only specific chip
+        channels, use :meth:`Arch.dac_calibration` instead. For a single channel, use
+        :meth:`PhaseShifter.dac_calibration`.
         
-        The calibration works by:
-        1. Setting known currents/voltages on each channel
-        2. Measuring actual output values
-        3. Computing slope of (set vs measured)
-        4. Updating CORRECTION[ch] = old_CORRECTION[ch] / slope
+        The calibration process for each channel:
+        1. Set current to 300 mA
+        2. Measure power at V = 1V
+        3. Measure power at V = 30V
+        4. Compute slope coefficient
+        5. Store slope in POWER_CORRECTION[channel]
+        
+        Examples
+        --------
+        >>> XPOW.dac_calibration(verbose=True)  # Calibrate all channels with details
+        >>> XPOW.dac_calibration(plot=True)     # Calibrate and show comparison plots
         """
         if verbose:
-            print(f"🔧 Calibrating all {XPOW.N_CHANNELS} XPOW channels...")
+            print(f"🔧 Calibrating DAC for all {XPOW.N_CHANNELS} XPOW channels...")
         
         for ch in range(1, XPOW.N_CHANNELS + 1):
-            channel = PhaseShifter(ch)
-            channel.update_coeff(plot=plot, verbose=verbose)
+            channel = PhaseShifter(ch, calibrate=False)
+            channel.dac_calibration(plot=plot, verbose=verbose)
         
-        print("✅ All XPOW correction coefficients updated.")
+        if verbose:
+            print("✅ All XPOW DAC calibrations completed.")
     
     @staticmethod
     def turn_off(verbose: bool = False):
@@ -277,7 +296,7 @@ class PhaseShifter:
             raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOW.N_CHANNELS}.")
         self.channel = channel_number
 
-        self.calibrate()
+        self.dac_calibration()
         
     def set_current(self, current: float, verbose: bool = False):
         """
@@ -396,7 +415,7 @@ class PhaseShifter:
         if _xpow.POWER_CORRECTION[self.channel - 1] is None:
             if verbose:
                 print(f"🔧 Auto-calibrating channel {self.channel}...")
-            self.calibrate(verbose=verbose)
+            self.dac_calibration(verbose=verbose)
         
         # Set fixed current at 300 mA
         self.set_current(300.0, verbose=verbose)
@@ -448,7 +467,7 @@ class PhaseShifter:
         
         return power
     
-    def calibrate(self, verbose: bool = False, plot: bool = False):
+    def dac_calibration(self, verbose: bool = False, plot: bool = False):
         """
         Calibrate power correction coefficient for this channel using 2-point measurement.
         
@@ -477,7 +496,7 @@ class PhaseShifter:
         Examples
         --------
         >>> ch = PhaseShifter(17)
-        >>> ch.calibrate(verbose=True)
+        >>> ch.dac_calibration(verbose=True)
         >>> ch.set_power(0.6)  # Now uses calibrated coefficient
         """
         if verbose:
@@ -778,7 +797,7 @@ class PhaseShifter:
         -----
         The power is computed as: phase * PHASE_CONVERSION[channel]
         where PHASE_CONVERSION is the phase-to-power coefficient in W/rad.
-        This coefficient can be calibrated using Arch.calibrate_phase().
+        This coefficient can be calibrated using Arch.phase_calibration().
         """
         # Compute power needed for the desired phase
         power = phase * _xpow.PHASE_CONVERSION[self.channel - 1]
@@ -816,78 +835,23 @@ class PhaseShifter:
         
         return phase
     
-    def update_coeff(self, plot: bool = False, verbose: bool = False):
-        """
-        Calibrate correction coefficients for this specific channel.
-        
-        Scans current and voltage, measures actual output, and refines
-        CUR_CORRECTION and VOLT_CORRECTION for this channel only.
-        
-        Parameters
-        ----------
-        plot : bool, optional
-            If True, display fit results. Default is False.
-        verbose : bool, optional
-            If True, print calibration details. Default is False.
-            
-        Notes
-        -----
-        This method only updates the correction coefficient for this channel,
-        leaving all other channels unchanged.
-        """
-        test_currents = np.linspace(1, XPOW.MAX_CURRENT, 10)
-        test_voltages = np.linspace(0.1, XPOW.MAX_VOLTAGE, 10)
-        
-        # Turn off all channels first
-        XPOW.turn_off()
-        
-        # Current calibration
-        measured = []
-        for c in test_currents:
-            self.set_current(c, verbose=verbose)
-            val = self.get_current(verbose=verbose)
-            measured.append(val)
-        measured = np.array(measured)
-        coeffs = np.polyfit(test_currents, measured, 1)
-        
-        old_cur = _xpow.CUR_CORRECTION[self.channel - 1]
-        new_cur = old_cur / coeffs[0] if coeffs[0] != 0 else old_cur
-        _xpow.CUR_CORRECTION[self.channel - 1] = new_cur
-        
-        # Voltage calibration
-        measured_v = []
-        for v in test_voltages:
-            self.set_voltage(v, verbose=verbose)
-            val = self.get_voltage(verbose=verbose)
-            measured_v.append(val)
-        measured_v = np.array(measured_v)
-        coeffs_v = np.polyfit(test_voltages, measured_v, 1)
-        
-        old_volt = _xpow.VOLT_CORRECTION[self.channel - 1]
-        new_volt = old_volt / coeffs_v[0] if coeffs_v[0] != 0 else old_volt
-        _xpow.VOLT_CORRECTION[self.channel - 1] = new_volt
-        
-        if plot:
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(10,4))
-            plt.subplot(1,2,1)
-            plt.plot(test_currents, measured, 'o-', label=f'CH{self.channel} Current')
-            plt.plot(test_currents, coeffs[0]*test_currents+coeffs[1], '--', label='Fit')
-            plt.xlabel('Set Current (mA)')
-            plt.ylabel('Measured Current (mA)')
-            plt.title(f'Current Calibration CH{self.channel}')
-            plt.legend()
-            plt.subplot(1,2,2)
-            plt.plot(test_voltages, measured_v, 'o-', label=f'CH{self.channel} Voltage')
-            plt.plot(test_voltages, coeffs_v[0]*test_voltages+coeffs_v[1], '--', label='Fit')
-            plt.xlabel('Set Voltage (V)')
-            plt.ylabel('Measured Voltage (V)')
-            plt.title(f'Voltage Calibration CH{self.channel}')
-            plt.legend()
-            plt.tight_layout()
-        
-        if verbose:
-            print(f"✅ Channel {self.channel} calibrated: CUR={new_cur:.4f}, VOLT={new_volt:.4f}")
+    def __getattr__(self, name):
+        """Handle deprecated method calls with warnings."""
+        if name == 'calibrate':
+            warnings.warn(
+                "calibrate() is deprecated, use dac_calibration() instead",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return self.dac_calibration
+        elif name == 'update_coeff':
+            warnings.warn(
+                "update_coeff() is deprecated and no longer needed. DAC calibration is handled by dac_calibration().",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return lambda plot=False, verbose=False: print(f"⚠️  update_coeff() is deprecated and does nothing.") if verbose else None
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 class Arch:
     """
@@ -965,6 +929,24 @@ class Arch:
         
         # Ensure XPOW connection is established
         _xpow.connect()
+
+    def __getattr__(self, name):
+        """Handle deprecated method calls with warnings."""
+        if name == 'update_coeffs':
+            warnings.warn(
+                "update_coeffs() is deprecated and no longer needed. DAC calibration is handled by dac_calibration().",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return lambda plot=False, verbose=False: print(f"⚠️  update_coeffs() is deprecated and does nothing.") if verbose else None
+        elif name == 'calibrate_phase':
+            warnings.warn(
+                "calibrate_phase() is deprecated, use phase_calibration() instead",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return self.phase_calibration
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __getitem__(self, topa_index: int) -> PhaseShifter:
         """
@@ -1224,34 +1206,42 @@ class Arch:
         """
         return np.array([ch.get_phase(verbose=verbose) for ch in self.channels])
     
-    def update_coeffs(self, plot: bool = False, verbose: bool = False):
+    def dac_calibration(self, plot: bool = False, verbose: bool = False):
         """
-        Calibrate correction coefficients for all channels in this chip architecture.
+        Calibrate DAC power correction coefficients for all channels in this architecture.
         
-        This method only calibrates the channels (TOPAs) used by this specific chip,
-        leaving other XPOW channels unchanged.
+        This method performs 2-point power measurements on each TOPA channel to compute
+        the slope coefficients used for accurate power control. Only channels used by
+        this specific architecture are calibrated, leaving other XPOW channels unchanged.
         
         Parameters
         ----------
         plot : bool, optional
-            If True, display fit results for visual inspection. Default is False.
+            If True, display calibration comparison plots for each channel. Default is False.
         verbose : bool, optional
-            If True, print calibration details. Default is False.
+            If True, print calibration details for each channel. Default is False.
             
         Notes
         -----
-        Only updates CORRECTION coefficients for channels in self.topas.
-        For calibrating all 40 XPOW channels, use XPOW.update_all_coeffs().
+        Only calibrates TOPA channels in self.topas (the channels used by this architecture).
+        For calibrating all 40 XPOW channels, use :meth:`XPOW.dac_calibration`.
+        For a single channel, use :meth:`PhaseShifter.dac_calibration`.
+        
+        Examples
+        --------
+        >>> arch = Arch6()
+        >>> arch.dac_calibration(verbose=True)  # Calibrate only Arch6's 4 TOPAs
         """
         if verbose:
-            print(f"🔧 Calibrating {len(self.channels)} channels for {self.name}...")
+            print(f"🔧 Calibrating DAC for {len(self.channels)} channels in {self.name}...")
         
         for channel in self.channels:
-            channel.update_coeff(plot=plot, verbose=verbose)
+            channel.dac_calibration(plot=plot, verbose=verbose)
         
-        print(f"✅ Correction coefficients updated for {self.name} (channels {list(self.topas)}).")
+        if verbose:
+            print(f"✅ DAC calibration completed for {self.name} (channels {list(self.topas)}).")
     
-    def calibrate_phase(self, samples: int, cred3_object, crop_centers, crop_sizes=10, plot: bool = False, verbose: bool = False):
+    def phase_calibration(self, samples: int, cred3_object, crop_centers, crop_sizes=10, plot: bool = False, verbose: bool = False):
         """
         Calibrate phase-to-power conversion coefficients for all channels in this chip.
         
@@ -1297,7 +1287,6 @@ class Arch:
             else:
                 axs = [axs]
 
-        new_coeffs = []
         for idx, channel in enumerate(self.channels):
 
             # Turn off all channels first
@@ -1393,7 +1382,6 @@ class Arch:
                 new_coeff = avg_period / (2 * np.pi)
                 
                 _xpow.PHASE_CONVERSION[channel.channel - 1] = new_coeff
-                new_coeffs.append(new_coeff)
                 
                 if verbose:
                     print(f"  ✅ Channel {channel.channel} calibrated: Period={avg_period:.4f} W -> Coeff={new_coeff:.4f} W/rad")
@@ -1479,9 +1467,6 @@ class Arch:
             
         if verbose:
             print("✅ Phase calibration completed.")
-
-        return new_coeffs
-
 
     def characterize(self, dm_object, cred3_object, crop_centers, crop_sizes=10, 
                     phase_samples=51, n_averages=10, plot=True, verbose=True):

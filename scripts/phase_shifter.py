@@ -34,7 +34,7 @@ chip = kbench.Chip(6)
 # =============================================================================
 # channel = kbench.PhaseShifter(17)
 
-# channel.calibrate(verbose=True)
+# channel.dac_calibration(verbose=True)
 
 # power_range = np.linspace(0, 1, 31) # in watt
 
