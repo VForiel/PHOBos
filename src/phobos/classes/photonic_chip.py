@@ -2,7 +2,7 @@ import numpy as np
 from .. import serial
 import time
 # import matplotlib.pyplot as plt  # Lazy loaded
-# from scipy.optimize import curve_fit # Lazy loaded
+# from scipy.optimize import minimize # Lazy loaded
 from .. import SANDBOX_MODE
 import re
 import warnings
@@ -276,8 +276,6 @@ class PhaseShifter:
         if not (1 <= channel_number <= XPOW.N_CHANNELS):
             raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOW.N_CHANNELS}.")
         self.channel = channel_number
-
-        self.update_coeff()
         
     def set_current(self, current: float, verbose: bool = False):
         """
@@ -1191,8 +1189,16 @@ class Arch:
                 p0 = [(np.max(y_data)-np.min(y_data))/2, 10, 0, 0, np.mean(y_data), 0]
                 
                 try:
-                    from scipy.optimize import curve_fit
-                    popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0)#, maxfev=10000)
+                    from scipy.optimize import minimize
+                    
+                    # Define residual function for minimize
+                    def residual(params):
+                        return np.sum((y_data - sine_func(power_range, *params))**2)
+                    
+                    # Use minimize with robust method
+                    result = minimize(residual, p0, method='L-BFGS-B', 
+                                    options={'maxiter': 10000, 'ftol': 1e-9})
+                    popt = result.x
                     
                     A, B, C, D, E, F = popt
                     period = 2 * np.pi / np.abs(B)
@@ -1393,12 +1399,23 @@ class Arch:
                         
                         p0 = [flux_amp, 1.0, 0.0, 0.0, flux_mean, 0.0]  # [A, B, C, D, E, F]
                         
-                        # Fit
-                        from scipy.optimize import curve_fit
-                        popt, _ = curve_fit(sine_func, phase_range, fluxes[:, out_idx], 
-                                           p0=p0, maxfev=5000)
-                        fit_params[out_idx] = popt
-                        fit_success[out_idx] = True
+                        # Fit using minimize for better robustness
+                        from scipy.optimize import minimize
+                        
+                        # Define residual function for minimize
+                        def residual(params):
+                            return np.sum((fluxes[:, out_idx] - sine_func(phase_range, *params))**2)
+                        
+                        # Use minimize with robust method
+                        result = minimize(residual, p0, method='L-BFGS-B', 
+                                        options={'maxiter': 10000, 'ftol': 1e-9})
+                        
+                        if result.success:
+                            fit_params[out_idx] = result.x
+                            fit_success[out_idx] = True
+                        else:
+                            fit_params[out_idx] = np.zeros(6)
+                            fit_success[out_idx] = False
                     except:
                         # If fit fails, store zeros
                         fit_params[out_idx] = np.zeros(6)
