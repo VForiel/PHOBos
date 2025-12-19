@@ -276,6 +276,8 @@ class PhaseShifter:
         if not (1 <= channel_number <= XPOW.N_CHANNELS):
             raise ValueError(f"❌ Invalid channel number {channel_number}. Must be between 1 and {XPOW.N_CHANNELS}.")
         self.channel = channel_number
+
+        self.update_coeff()
         
     def set_current(self, current: float, verbose: bool = False):
         """
@@ -1112,7 +1114,7 @@ class Arch:
             If True, print calibration details. Default is False.
         """
         
-        power_range = np.linspace(0, 1.2, samples)
+        power_range = np.linspace(0, 1, samples)
         
         # Define the fitting function: (A + F*P) * sin(B * P + C) + D * P + E
         def sine_func(x, A, B, C, D, E, F):
@@ -1133,7 +1135,8 @@ class Arch:
                 axs = np.atleast_1d(axs).flatten()
             else:
                 axs = [axs]
-                
+
+        new_coeffs = []
         for idx, channel in enumerate(self.channels):
 
             # Turn off all channels first
@@ -1189,11 +1192,15 @@ class Arch:
                 
                 try:
                     from scipy.optimize import curve_fit
-                    popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0, maxfev=10000)
+                    popt, _ = curve_fit(sine_func, power_range, y_data, p0=p0)#, maxfev=10000)
                     
                     A, B, C, D, E, F = popt
                     period = 2 * np.pi / np.abs(B)
                     periods.append(period)
+
+                    if verbose:
+                        print("Coeffs:")
+                        print(popt)
                     
                     if plot:
                         # Plot data points and fit
@@ -1217,6 +1224,7 @@ class Arch:
                 new_coeff = avg_period / (2 * np.pi)
                 
                 _xpow.PHASE_CONVERSION[channel.channel - 1] = new_coeff
+                new_coeffs.append(new_coeff)
                 
                 if verbose:
                     print(f"  ✅ Channel {channel.channel} calibrated: Period={avg_period:.4f} W -> Coeff={new_coeff:.4f} W/rad")
@@ -1234,6 +1242,9 @@ class Arch:
             
         if verbose:
             print("✅ Phase calibration completed.")
+
+        return new_coeffs
+
 
     def characterize(self, dm_object, cred3_object, crop_centers, crop_sizes=10, 
                     phase_samples=51, n_averages=10, plot=True, verbose=True):

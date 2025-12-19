@@ -66,5 +66,7 @@ except Exception:
     pass
 
 
+from .classes import Arch6
+
 # Make bmc, serial and classes available for other modules
-__all__ = ['bmc', 'serial', 'shm', 'PupilMask', 'FilterWheel', 'DM', 'Segment', 'Chip', 'Arch', 'XPOW', 'XPOWController', 'PhaseShifter', 'Channel', 'xpow', 'Cred3', 'atmosphere', 'SANDBOX_MODE', '__version__']
+__all__ = ['bmc', 'serial', 'shm', 'PupilMask', 'FilterWheel', 'DM', 'Segment', 'Chip', 'Arch', 'XPOW', 'XPOWController', 'PhaseShifter', 'Channel', 'xpow', 'Cred3', 'atmosphere', 'SANDBOX_MODE', '__version__', 'Arch6']
