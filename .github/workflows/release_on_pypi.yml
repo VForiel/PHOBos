@@ -42,4 +42,5 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          twine upload dist/*
+          # Only a new version number is uploaded: pushes that keep the version are skipped instead of failing
+          twine upload --skip-existing dist/*
